@@ -1,220 +1,78 @@
 import '../models/quotation_input.dart';
 import '../models/component_cost.dart';
+import '../models/component_type.dart';
 import '../models/costing_result.dart';
 import '../validators/quotation_validator.dart';
 
-class CalculatorUtils {
-  static double parse(String value) {
-    return double.tryParse(value) ?? 0;
-  }
+// ── Domain constants ──────────────────────────────────────────────────────────
 
-  static double round2(double value) {
-    return double.parse(value.toStringAsFixed(2));
-  }
+/// Blended effective GST rate across all component types (5% and 18%).
+/// Approximately 8.9% when weighted by typical component cost distribution.
+const double kEffectiveGstRate = 0.089;
 
-  static double percentage(double base, String percent) {
-    final p = parse(percent);
-    return base * p / 100;
-  }
-}
+/// Fixed subsidy processing fee in ₹ when [QuotationInput.isSubsidyProject] is true.
+const double kSubsidyProcessingFeeAmount = 99.0;
 
+// ── Utility ───────────────────────────────────────────────────────────────────
+
+double _round2(double value) =>
+    double.parse(value.toStringAsFixed(2));
+
+double _pct(double base, double percent) => base * percent / 100;
+
+// ── Use case ─────────────────────────────────────────────────────────────────
+
+/// Calculates a full solar project quotation from [input].
+///
+/// Returns a [CostingResult] with all line-items populated.
+/// If required components are incomplete ([isQuotationComplete] returns false),
+/// the totals are zeroed but the partial [components] map is still returned
+/// so the UI can show which items are missing.
 CostingResult calculateQuotation(QuotationInput input) {
-  final double plantCapacity =
-      CalculatorUtils.parse(input.plantCapacity);
+  final double plantCapacity = input.plantCapacity;
 
   final Map<String, ComponentCost> components = {};
   double systemSubTotal = 0;
 
-  // =========================================================
-  // HELPERS
-  // =========================================================
-  void addQtyComponent({
-    required String key,
-    required String label,
-    required String qty,
-    required String price,
-  }) {
-    final q = CalculatorUtils.parse(qty);
-    final p = CalculatorUtils.parse(price);
+  // ── Component calculation ─────────────────────────────────────────────────
 
-    if (q > 0 && p > 0) {
-      final baseCost = q * p;
+  for (final key in QuotationInput.componentKeys) {
+    final component = input.componentFor(key);
+    final label = componentDisplayNames[key] ?? key;
 
-      components[key] = ComponentCost(
-        name: label,
-        quantity: q,
-        unitPrice: p,
-        subTotal: CalculatorUtils.round2(baseCost),
-      );
+    final q = component.quantity;
+    final p = component.unitPrice;
 
-      systemSubTotal += baseCost;
+    if (q <= 0 || p <= 0) continue;
+
+    double baseCost;
+
+    switch (component.type) {
+      case ComponentType.quantityBased:
+        baseCost = q * p;
+
+      case ComponentType.plantCapacityBased:
+        if (plantCapacity <= 0) continue;
+        baseCost = plantCapacity * p * q;
+
+      case ComponentType.panelCapacityBased:
+        final panelWp = component.panelCapacityWp;
+        if (panelWp <= 0) continue;
+        baseCost = panelWp * p * q;
     }
-  }
 
-  void addCapacityComponent({
-    required String key,
-    required String label,
-    required String qty,
-    required String price,
-  }) {
-    final q = CalculatorUtils.parse(qty);
-    final p = CalculatorUtils.parse(price);
-
-    if (plantCapacity > 0 && q > 0 && p > 0) {
-      final baseCost = plantCapacity * p * q;
-
-      components[key] = ComponentCost(
-        name: label,
-        quantity: q,
-        unitPrice: p,
-        subTotal: CalculatorUtils.round2(baseCost),
-      );
-
-      systemSubTotal += baseCost;
-    }
-  }
-
-  // =========================================================
-  // COMPONENT CALCULATIONS (ALWAYS)
-  // =========================================================
-
-  // Solar Panel
-  final panelCapacity =
-      CalculatorUtils.parse(input.solarPanel.capacity);
-  final panelQty =
-      CalculatorUtils.parse(input.solarPanel.quantity);
-  final panelPrice =
-      CalculatorUtils.parse(input.solarPanel.basePrice);
-
-  if (panelCapacity > 0 && panelQty > 0 && panelPrice > 0) {
-    final baseCost =
-        panelCapacity * panelPrice * panelQty;
-
-    components['solarPanel'] = ComponentCost(
-      name: 'Solar Panel',
-      quantity: panelQty,
-      unitPrice: panelPrice,
-      subTotal: CalculatorUtils.round2(baseCost),
+    components[key] = ComponentCost(
+      name: label,
+      quantity: q,
+      unitPrice: p,
+      subTotal: _round2(baseCost),
     );
 
     systemSubTotal += baseCost;
   }
 
-  addQtyComponent(
-    key: 'invertor',
-    label: 'Inverter',
-    qty: input.invertor.quantity,
-    price: input.invertor.basePrice,
-  );
+  // ── Stop here if the quotation is incomplete ──────────────────────────────
 
-  addCapacityComponent(
-    key: 'mountingStructure',
-    label: 'Mounting Structure',
-    qty: input.mountingStructure.quantity,
-    price: input.mountingStructure.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'dcdb',
-    label: 'DCDB',
-    qty: input.dcdb.quantity,
-    price: input.dcdb.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'acdb',
-    label: 'ACDB',
-    qty: input.acdb.quantity,
-    price: input.acdb.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'acArmouredCable',
-    label: 'AC Armoured Cable',
-    qty: input.acArmouredCable.quantity,
-    price: input.acArmouredCable.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'acFlexibleCable',
-    label: 'AC Flexible Cable',
-    qty: input.acFlexibleCable.quantity,
-    price: input.acFlexibleCable.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'dcCable',
-    label: 'DC Cable',
-    qty: input.dcCable.quantity,
-    price: input.dcCable.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'acEarthingCable',
-    label: 'AC Earthing Cable',
-    qty: input.acEarthingCable.quantity,
-    price: input.acEarthingCable.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'earthingMaterial',
-    label: 'Earthing Material',
-    qty: input.earthingMaterial.quantity,
-    price: input.earthingMaterial.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'la',
-    label: 'Lightning Arrester',
-    qty: input.la.quantity,
-    price: input.la.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'electricalsPlumbing',
-    label: 'Electricals & Plumbing',
-    qty: input.electricalsPlumbing.quantity,
-    price: input.electricalsPlumbing.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'civilWork',
-    label: 'Civil Work',
-    qty: input.civilWork.quantity,
-    price: input.civilWork.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'transport',
-    label: 'Transport',
-    qty: input.transport.quantity,
-    price: input.transport.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'netMetersAndFees',
-    label: 'Net Metering Fees',
-    qty: input.netMetersAndFees.quantity,
-    price: input.netMetersAndFees.basePrice,
-  );
-
-  addQtyComponent(
-    key: 'netMeteringPayments',
-    label: 'Net Metering Payments',
-    qty: input.netMeteringPayments.quantity,
-    price: input.netMeteringPayments.basePrice,
-  );
-
-  addCapacityComponent(
-    key: 'installation',
-    label: 'Installation',
-    qty: input.installation.quantity,
-    price: input.installation.basePrice,
-  );
-
-  // =========================================================
-  // ❌ STOP HERE IF SYSTEM NOT COMPLETE
-  // =========================================================
   if (!isQuotationComplete(input)) {
     return CostingResult(
       components: components,
@@ -231,28 +89,21 @@ CostingResult calculateQuotation(QuotationInput input) {
     );
   }
 
-  // =========================================================
-  // PROJECT-LEVEL CALCULATION
-  // =========================================================
-  final contingency =
-      CalculatorUtils.percentage(systemSubTotal, input.contingency.percentage);
-  final cp1 =
-      CalculatorUtils.percentage(systemSubTotal, input.cp1.percentage);
-  final cp2 =
-      CalculatorUtils.percentage(systemSubTotal, input.cp2.percentage);
-  final amc =
-      CalculatorUtils.percentage(systemSubTotal, input.amc.percentage);
-  
-  final double subsidyProcessingFee =
-    CalculatorUtils.parse(input.subsidyProcessingFee.amount);
+  // ── Project-level additional costs ────────────────────────────────────────
+
+  final double contingency = _pct(systemSubTotal, input.contingency.percentage);
+  final double cp1         = _pct(systemSubTotal, input.cp1.percentage);
+  final double cp2         = _pct(systemSubTotal, input.cp2.percentage);
+  final double amc         = _pct(systemSubTotal, input.amc.percentage);
+
+  // Subsidy processing fee: only non-zero when isSubsidyProject is true.
+  // The fixed amount comes from the input (set by the mapper); default is 0.
+  final double subsidyProcessingFee = input.subsidyProcessingFee.amount;
 
   final double grandTotal =
       systemSubTotal + contingency + cp1 + cp2 + amc + subsidyProcessingFee;
 
-  const double effectiveGstRate = 0.089;
-
-  final double projectCostAfterGst =
-      grandTotal * (1 + effectiveGstRate);
+  final double projectCostAfterGst = grandTotal * (1 + kEffectiveGstRate);
 
   final double perWpBeforeGst =
       plantCapacity > 0 ? grandTotal / plantCapacity : 0;
@@ -262,15 +113,15 @@ CostingResult calculateQuotation(QuotationInput input) {
 
   return CostingResult(
     components: components,
-    systemSubTotal: CalculatorUtils.round2(systemSubTotal),
-    contingency: CalculatorUtils.round2(contingency),
-    cp1: CalculatorUtils.round2(cp1),
-    cp2: CalculatorUtils.round2(cp2),
-    amc: CalculatorUtils.round2(amc),
-    subsidyProcessingFee: 0,
-    grandTotal: CalculatorUtils.round2(grandTotal),
-    projectCostAfterGst: CalculatorUtils.round2(projectCostAfterGst),
-    perWpBeforeGst: CalculatorUtils.round2(perWpBeforeGst),
-    perWpAfterGst: CalculatorUtils.round2(perWpAfterGst),
+    systemSubTotal:       _round2(systemSubTotal),
+    contingency:          _round2(contingency),
+    cp1:                  _round2(cp1),
+    cp2:                  _round2(cp2),
+    amc:                  _round2(amc),
+    subsidyProcessingFee: _round2(subsidyProcessingFee), // ← bug fixed: was hardcoded 0
+    grandTotal:           _round2(grandTotal),
+    projectCostAfterGst:  _round2(projectCostAfterGst),
+    perWpBeforeGst:       _round2(perWpBeforeGst),
+    perWpAfterGst:        _round2(perWpAfterGst),
   );
 }

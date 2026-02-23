@@ -5,6 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../domain/models/costing_context.dart';
 import '../../domain/models/costing_snapshot.dart';
 import '../../domain/models/saved_costing.dart';
+import '../../domain/models/quotation_input.dart';
 import '../state/costing_store.dart';
 import '../state/quotation_form_state.dart';
 import '../widgets/component_list.dart';
@@ -18,11 +19,10 @@ class CostingPage extends StatefulWidget {
   final SavedCosting? existingCosting;
   final bool isDuplicate;
 
-
   const CostingPage({
     super.key,
     this.existingCosting,
-    this.isDuplicate = false
+    this.isDuplicate = false,
   });
 
   @override
@@ -30,19 +30,15 @@ class CostingPage extends StatefulWidget {
 }
 
 class _CostingPageState extends State<CostingPage> {
-  final TextEditingController plantCapacityController =
-      TextEditingController();
+  final TextEditingController plantCapacityController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
-  final TextEditingController roofIdentifierController =
-    TextEditingController();
-
+  final TextEditingController roofIdentifierController = TextEditingController();
 
   QuotationFormState formState = QuotationFormState.initial();
   CostingResult costingResult = CostingResult.empty();
 
-  // =========================================================
-  // DERIVED STATE
-  // =========================================================
+  // ── Derived state ──────────────────────────────────────────────────────────
+
   bool get isProjectCalculated => costingResult.grandTotal > 0;
 
   bool isComponentMissing(String key) {
@@ -52,29 +48,26 @@ class _CostingPageState extends State<CostingPage> {
 
   bool isComponentModified(String key) {
     final current = formState.components[key];
-    final initial =
-        QuotationFormState.initial().components[key];
-
+    final initial = QuotationFormState.initial().components[key];
     if (current == null || initial == null) return false;
 
     return current.quantity != initial.quantity ||
-        current.basePrice != initial.basePrice ||
-        current.capacity != initial.capacity ||
+        current.unitPrice != initial.unitPrice ||           // ← was basePrice
+        current.panelCapacityWp != initial.panelCapacityWp || // ← was capacity
         current.specification != initial.specification;
   }
 
-  // =========================================================
-  // LIFECYCLE
-  // =========================================================
-@override
-void initState() {
+  // ── Lifecycle ──────────────────────────────────────────────────────────────
+
+  @override
+  void initState() {
     super.initState();
 
     if (widget.existingCosting != null) {
       final ctx = widget.existingCosting!.context;
       final snap = widget.existingCosting!.snapshot;
 
-      // 🔥 FULL STATE RESTORE FROM SCRATCH
+      // Restore full state from snapshot — convert ComponentInputSnapshot → ComponentFormInput
       formState = QuotationFormState.initial().copyWith(
         plantCapacity: ctx.plantCapacity,
         systemType: ctx.systemType,
@@ -82,35 +75,23 @@ void initState() {
         roofType: ctx.roofType,
         roofIdentifier: ctx.roofIdentifier,
         isSubsidyProject: ctx.isSubsidyProject,
-        contingency: PercentageFormInput(
-          percentage: snap.contingency,
+        contingency: PercentageFormInput(percentage: snap.contingency),
+        cp1: PercentageFormInput(percentage: snap.cp1),
+        cp2: PercentageFormInput(percentage: snap.cp2),
+        amc: PercentageFormInput(percentage: snap.amc),
+        // ← fromSnapshot() converts domain ComponentInputSnapshot → UI ComponentFormInput
+        components: snap.componentInputs.map(
+          (key, snap) => MapEntry(key, ComponentFormInput.fromSnapshot(snap)),
         ),
-        cp1: PercentageFormInput(
-          percentage: snap.cp1,
-        ),
-        cp2: PercentageFormInput(
-          percentage: snap.cp2,
-        ),
-        amc: PercentageFormInput(
-          percentage: snap.amc,
-        ),
-
-        // 🔥 RESTORE FULL COMPONENT INPUTS
-        components: snap.componentInputs,
       );
     }
 
-    // 🔥 NOW sync controllers AFTER state is ready
-    plantCapacityController.text =
-        formState.plantCapacity.toString();
-
-    roofIdentifierController.text =
-        formState.roofIdentifier;
+    plantCapacityController.text = formState.plantCapacity.toString();
+    roofIdentifierController.text = formState.roofIdentifier;
 
     if (widget.isDuplicate) {
       formState = formState.copyWith(
-        roofIdentifier:
-            "${formState.roofIdentifier} - Copy",
+        roofIdentifier: '${formState.roofIdentifier} - Copy',
       );
     }
 
@@ -127,24 +108,19 @@ void initState() {
     super.dispose();
   }
 
-  // =========================================================
-  // CALCULATION PIPELINE
-  // =========================================================
+  // ── Calculation pipeline ──────────────────────────────────────────────────
+
   void _recalculate({bool fromAdditionalCost = false}) {
     final input = mapFormStateToQuotationInput(formState);
     final result = calculateQuotation(input);
 
-    final wasNotCalculated =
-        costingResult.grandTotal == 0;
-    final isNowCalculated =
-        result.grandTotal > 0;
+    final wasNotCalculated = costingResult.grandTotal == 0;
+    final isNowCalculated = result.grandTotal > 0;
 
     setState(() {
       costingResult = result;
     });
 
-    // Scroll only when project becomes calculated
-    // OR additional cost changes after system is ready
     if ((wasNotCalculated && isNowCalculated) ||
         (fromAdditionalCost && isNowCalculated)) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -159,50 +135,19 @@ void initState() {
     }
   }
 
-  // =========================================================
-  // COMPONENT DISPLAY NAMES
-  // =========================================================
-  static const Map<String, String> componentNames = {
-    'solarPanel': 'Solar Panel',
-    'invertor': 'Inverter',
-    'mountingStructure': 'Mounting Structure',
-    'dcdb': 'DCDB',
-    'acdb': 'ACDB',
-    'acArmouredCable': 'AC Armoured Cable',
-    'acFlexibleCable': 'AC Flexible Cable',
-    'dcCable': 'DC Cable',
-    'acEarthingCable': 'AC Earthing Cable',
-    'earthingMaterial': 'Earthing Material',
-    'la': 'Lightning Arrester',
-    'installation': 'Installation',
-    'electricalsPlumbing': 'Electricals & Plumbing',
-    'civilWork': 'Civil Work',
-    'transport': 'Transport',
-    'netMetersAndFees': 'Net Metering Fees',
-    'netMeteringPayments': 'Net Metering Payments',
-  };
+  // ── UI component map ──────────────────────────────────────────────────────
 
-  // =========================================================
-  // UI COMPONENTS
-  // =========================================================
   Map<String, ComponentCost> get uiComponents {
     return formState.components.map((key, input) {
-      final calculated =
-          costingResult.components[key]?.subTotal ?? 0;
-
-      final baseName = componentNames[key] ?? key;
+      final calculated = costingResult.components[key]?.subTotal ?? 0;
+      final baseName = componentDisplayNames[key] ?? key;
 
       String displayName = baseName;
 
-      // Solar panel → show panel capacity
-      if (key == 'solarPanel' &&
-          input.capacity != null &&
-          input.capacity! > 0) {
+      if (key == 'solarPanel' && input.panelCapacityWp > 0) {  // ← was capacity
         displayName =
-            '$baseName (${input.capacity!.toStringAsFixed(0)} Wp)';
-      }
-      // Cables → show specification
-      else if (input.specification != null &&
+            '$baseName (${input.panelCapacityWp.toStringAsFixed(0)} Wp)';
+      } else if (input.specification != null &&
           input.specification!.isNotEmpty) {
         displayName = '$baseName (${input.specification})';
       }
@@ -212,35 +157,31 @@ void initState() {
         ComponentCost(
           name: displayName,
           quantity: input.quantity,
-          unitPrice: input.basePrice,
+          unitPrice: input.unitPrice,    // ← was basePrice
           subTotal: calculated,
         ),
       );
     });
   }
 
-  // =========================================================
-  // EDIT COMPONENT
-  // =========================================================
+  // ── Edit component ────────────────────────────────────────────────────────
+
   void onEditComponent(String key) {
     final input = formState.components[key];
     if (input == null) return;
 
     final uiComponent = uiComponents[key]!;
-    final initialInput =
-        QuotationFormState.initial().components[key]!;
+    final initialInput = QuotationFormState.initial().components[key]!;
 
     showGeneralDialog(
       context: context,
-      barrierLabel: "Edit Component",
+      barrierLabel: 'Edit Component',
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha: 0.45),
       transitionDuration: const Duration(milliseconds: 280),
-      pageBuilder: (context, animation, secondaryAnimation) {
-        return const SizedBox.shrink();
-      },
-      transitionBuilder:
-          (context, animation, secondaryAnimation, child) {
+      pageBuilder: (context, animation, secondaryAnimation) =>
+          const SizedBox.shrink(),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
         final curved = CurvedAnimation(
           parent: animation,
           curve: Curves.easeOutCubic,
@@ -257,10 +198,7 @@ void initState() {
                 end: Offset.zero,
               ).animate(curved),
               child: ScaleTransition(
-                scale: Tween<double>(
-                  begin: 0.97,
-                  end: 1,
-                ).animate(curved),
+                scale: Tween<double>(begin: 0.97, end: 1).animate(curved),
                 child: SafeArea(
                   top: false,
                   child: Material(
@@ -272,25 +210,19 @@ void initState() {
                           top: Radius.circular(28),
                         ),
                       ),
-                      padding:
-                          const EdgeInsets.fromLTRB(24, 12, 24, 24),
+                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          // Drag Handle
                           Container(
                             height: 4,
                             width: 44,
-                            margin:
-                                const EdgeInsets.only(bottom: 16),
+                            margin: const EdgeInsets.only(bottom: 16),
                             decoration: BoxDecoration(
                               color: Colors.grey.shade400,
-                              borderRadius:
-                                  BorderRadius.circular(2),
+                              borderRadius: BorderRadius.circular(2),
                             ),
                           ),
-
-                          // Actual Sheet Content
                           EditComponentSheet(
                             componentKey: key,
                             component: uiComponent,
@@ -299,29 +231,24 @@ void initState() {
                             onSave: ({
                               required double quantity,
                               required double unitPrice,
-                              double? capacity,
+                              double? panelCapacityWp,  // ← was capacity
                               String? specification,
                             }) {
                               setState(() {
-                                formState =
-                                    formState.copyWith(
+                                formState = formState.copyWith(
                                   components: {
                                     ...formState.components,
                                     key: input.copyWith(
                                       quantity: quantity,
-                                      basePrice:
-                                          unitPrice,
-                                      capacity: capacity ??
-                                          input.capacity,
+                                      unitPrice: unitPrice,       // ← was basePrice
+                                      panelCapacityWp: panelCapacityWp ?? // ← was capacity
+                                          input.panelCapacityWp,
                                       specification:
-                                          specification ??
-                                              input
-                                                  .specification,
+                                          specification ?? input.specification,
                                     ),
                                   },
                                 );
                               });
-
                               _recalculate();
                             },
                           ),
@@ -338,10 +265,8 @@ void initState() {
     );
   }
 
+  // ── Reset ─────────────────────────────────────────────────────────────────
 
-  // =========================================================
-  // RESET
-  // =========================================================
   void _resetAll() {
     setState(() {
       formState = QuotationFormState.initial();
@@ -350,9 +275,8 @@ void initState() {
     });
   }
 
-  // =========================================================
-  // UI
-  // =========================================================
+  // ── Build ─────────────────────────────────────────────────────────────────
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -369,8 +293,11 @@ void initState() {
             onPressed: isProjectCalculated
                 ? () {
                     final saved = SavedCosting(
-                      id: (widget.isDuplicate || widget.existingCosting == null)
-                          ? DateTime.now().millisecondsSinceEpoch.toString()
+                      id: (widget.isDuplicate ||
+                              widget.existingCosting == null)
+                          ? DateTime.now()
+                              .millisecondsSinceEpoch
+                              .toString()
                           : widget.existingCosting!.id,
                       createdAt: DateTime.now(),
                       context: CostingContext(
@@ -392,19 +319,23 @@ void initState() {
                         grandTotal: costingResult.grandTotal,
                         projectCostAfterGst:
                             costingResult.projectCostAfterGst,
-                        perWpAfterGst:
-                            costingResult.perWpAfterGst.toDouble(),
+                        perWpAfterGst: costingResult.perWpAfterGst,
                         components: costingResult.components,
-                        componentInputs: formState.components,
+                        // ← toSnapshot() converts UI ComponentFormInput → domain ComponentInputSnapshot
+                        componentInputs: formState.components.map(
+                          (key, input) =>
+                              MapEntry(key, input.toSnapshot()),
+                        ),
                       ),
                     );
 
                     final store = context.read<CostingStore>();
-
-                    if (widget.isDuplicate || widget.existingCosting == null) {
+                    if (widget.isDuplicate ||
+                        widget.existingCosting == null) {
                       store.addCosting(saved);
                     } else {
-                      store.updateCosting(widget.existingCosting!.id, saved);
+                      store.updateCosting(
+                          widget.existingCosting!.id, saved);
                     }
 
                     Navigator.pop(context);
@@ -425,92 +356,80 @@ void initState() {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // ================= SUMMARY =================
+                    // ── Summary ──────────────────────────────────────────
                     if (isProjectCalculated) ...[
                       _buildSummary(),
                       const SizedBox(height: 24),
                     ],
 
-                    // ================= SYSTEM DETAILS =================
-                    Text(
-                      'System Details',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    // ── System details ───────────────────────────────────
+                    Text('System Details',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
                       key: ValueKey(formState.systemType),
                       initialValue: formState.systemType,
-                      decoration: const InputDecoration(labelText: 'System Type'),
+                      decoration:
+                          const InputDecoration(labelText: 'System Type'),
                       items: const [
-                        DropdownMenuItem(value: 'Rooftop', child: Text('Rooftop')),
-                        DropdownMenuItem(value: 'Ground', child: Text('Ground Mounted')),
+                        DropdownMenuItem(
+                            value: 'Rooftop', child: Text('Rooftop')),
+                        DropdownMenuItem(
+                            value: 'Ground',
+                            child: Text('Ground Mounted')),
                       ],
-                      onChanged: (v) {
-                        setState(() {
-                          formState = formState.copyWith(systemType: v!);
-                        });
-                      },
+                      onChanged: (v) => setState(
+                          () => formState = formState.copyWith(systemType: v!)),
                     ),
-
                     const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
                       key: ValueKey(formState.phaseType),
                       initialValue: formState.phaseType,
-                      decoration: const InputDecoration(labelText: 'Phase Type'),
+                      decoration:
+                          const InputDecoration(labelText: 'Phase Type'),
                       items: const [
-                        DropdownMenuItem(value: '1PH', child: Text('1 Phase')),
-                        DropdownMenuItem(value: '3PH', child: Text('3 Phase')),
+                        DropdownMenuItem(
+                            value: '1PH', child: Text('1 Phase')),
+                        DropdownMenuItem(
+                            value: '3PH', child: Text('3 Phase')),
                       ],
-                      onChanged: (v) {
-                        setState(() {
-                          formState = formState.copyWith(phaseType: v!);
-                        });
-                      },
+                      onChanged: (v) => setState(
+                          () => formState = formState.copyWith(phaseType: v!)),
                     ),
-
                     const SizedBox(height: 12),
 
                     DropdownButtonFormField<String>(
                       key: ValueKey(formState.roofType),
                       initialValue: formState.roofType,
-                      decoration: const InputDecoration(labelText: 'Roof Type'),
+                      decoration:
+                          const InputDecoration(labelText: 'Roof Type'),
                       items: const [
-                        DropdownMenuItem(value: 'RCC', child: Text('RCC Roof')),
-                        DropdownMenuItem(value: 'Shed', child: Text('Shed')),
-                        DropdownMenuItem(value: 'Ground', child: Text('Ground')),
+                        DropdownMenuItem(
+                            value: 'RCC', child: Text('RCC Roof')),
+                        DropdownMenuItem(
+                            value: 'Shed', child: Text('Shed')),
+                        DropdownMenuItem(
+                            value: 'Ground', child: Text('Ground')),
                       ],
-                      onChanged: (v) {
-                        setState(() {
-                          formState = formState.copyWith(roofType: v!);
-                        });
-                      },
+                      onChanged: (v) => setState(
+                          () => formState = formState.copyWith(roofType: v!)),
                     ),
-
                     const SizedBox(height: 12),
 
                     TextField(
                       controller: roofIdentifierController,
                       decoration: const InputDecoration(
-                        labelText: 'Roof Identifier',
-                      ),
-                      onChanged: (v) {
-                        setState(() {
-                          formState =
-                              formState.copyWith(roofIdentifier: v);
-                        });
-                      },
+                          labelText: 'Roof Identifier'),
+                      onChanged: (v) => setState(() =>
+                          formState = formState.copyWith(roofIdentifier: v)),
                     ),
-
                     const SizedBox(height: 24),
 
-                    // ================= PLANT CAPACITY =================
-                    Text(
-                      'Plant Capacity',
-                      style:
-                          Theme.of(context).textTheme.titleLarge,
-                    ),
+                    // ── Plant capacity ───────────────────────────────────
+                    Text('Plant Capacity',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
                     TextField(
                       controller: plantCapacityController,
@@ -520,49 +439,34 @@ void initState() {
                         prefixIcon: Icon(Icons.solar_power),
                       ),
                       onChanged: (v) {
-                        setState(() {
-                          formState = formState.copyWith(
-                            plantCapacity:
-                                double.tryParse(v) ?? 0,
-                          );
-                        });
+                        setState(() => formState = formState.copyWith(
+                              plantCapacity: double.tryParse(v) ?? 0,
+                            ));
                         _recalculate();
                       },
                     ),
-
                     const SizedBox(height: 24),
 
-                    // ================= SUBSIDY PROJECT =================
-                    Text(
-                      'Project Type',
-                      style: Theme.of(context).textTheme.titleLarge,
-                    ),
+                    // ── Project type ─────────────────────────────────────
+                    Text('Project Type',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 8),
-
                     SwitchListTile(
                       title: const Text('Government Subsidy Project'),
                       subtitle: const Text(
-                        'Includes subsidy processing & liaison charges',
-                      ),
+                          'Includes subsidy processing & liaison charges'),
                       value: formState.isSubsidyProject,
                       onChanged: (val) {
-                        setState(() {
-                          formState = formState.copyWith(
-                            isSubsidyProject: val,
-                          );
-                        });
+                        setState(() => formState =
+                            formState.copyWith(isSubsidyProject: val));
                         _recalculate(fromAdditionalCost: true);
                       },
                     ),
-
                     const SizedBox(height: 24),
 
-                    // ================= COMPONENTS =================
-                    Text(
-                      'System Components',
-                      style:
-                          Theme.of(context).textTheme.titleLarge,
-                    ),
+                    // ── Components ───────────────────────────────────────
+                    Text('System Components',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 12),
 
                     ComponentList(
@@ -574,80 +478,56 @@ void initState() {
 
                     const SizedBox(height: 16),
 
-                    // ================= SYSTEM SUBTOTAL =================
                     _summaryRow(
                       'System Cost (Before Additional Costs)',
                       costingResult.systemSubTotal,
                       highlight: true,
                     ),
-
                     const SizedBox(height: 24),
 
-                    // ================= ADDITIONAL COSTS =================
-                    Text(
-                      'Additional Costs',
-                      style:
-                          Theme.of(context).textTheme.titleLarge,
-                    ),
+                    // ── Additional costs ─────────────────────────────────
+                    Text('Additional Costs',
+                        style: Theme.of(context).textTheme.titleLarge),
                     const SizedBox(height: 12),
 
                     _percentageField(
                       'Contingency (%)',
                       formState.contingency.percentage,
                       (v) {
-                        setState(() {
-                          formState = formState.copyWith(
-                            contingency:
-                                formState.contingency.copyWith(
-                              percentage: v,
-                            ),
-                          );
-                        });
+                        setState(() => formState = formState.copyWith(
+                              contingency: formState.contingency
+                                  .copyWith(percentage: v),
+                            ));
                         _recalculate(fromAdditionalCost: true);
                       },
                     ),
-
                     _percentageField(
                       'Channel Partner 1 (%)',
                       formState.cp1.percentage,
                       (v) {
-                        setState(() {
-                          formState = formState.copyWith(
-                            cp1: formState.cp1.copyWith(
-                              percentage: v,
-                            ),
-                          );
-                        });
+                        setState(() => formState = formState.copyWith(
+                              cp1: formState.cp1.copyWith(percentage: v),
+                            ));
                         _recalculate(fromAdditionalCost: true);
                       },
                     ),
-
                     _percentageField(
                       'Channel Partner 2 (%)',
                       formState.cp2.percentage,
                       (v) {
-                        setState(() {
-                          formState = formState.copyWith(
-                            cp2: formState.cp2.copyWith(
-                              percentage: v,
-                            ),
-                          );
-                        });
+                        setState(() => formState = formState.copyWith(
+                              cp2: formState.cp2.copyWith(percentage: v),
+                            ));
                         _recalculate(fromAdditionalCost: true);
                       },
                     ),
-
                     _percentageField(
                       'AMC (%)',
                       formState.amc.percentage,
                       (v) {
-                        setState(() {
-                          formState = formState.copyWith(
-                            amc: formState.amc.copyWith(
-                              percentage: v,
-                            ),
-                          );
-                        });
+                        setState(() => formState = formState.copyWith(
+                              amc: formState.amc.copyWith(percentage: v),
+                            ));
                         _recalculate(fromAdditionalCost: true);
                       },
                     ),
@@ -669,9 +549,8 @@ void initState() {
     );
   }
 
-  // =========================================================
-  // HELPERS
-  // =========================================================
+  // ── Widget helpers ────────────────────────────────────────────────────────
+
   Widget _buildSummary() {
     return Container(
       decoration: BoxDecoration(
@@ -686,47 +565,29 @@ void initState() {
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          _summaryRow(
-            'Project Cost (Before GST)',
-            costingResult.grandTotal,
-            highlight: true,
-          ),
-          _summaryRow(
-            'Project Cost (After GST)',
-            costingResult.projectCostAfterGst,
-            highlight: true,
-          ),
+          _summaryRow('Project Cost (Before GST)', costingResult.grandTotal,
+              highlight: true),
+          _summaryRow('Project Cost (After GST)',
+              costingResult.projectCostAfterGst,
+              highlight: true),
           const Divider(),
-          _summaryRow(
-            '₹ / Wp (Before GST)',
-            costingResult.perWpBeforeGst,
-          ),
-          _summaryRow(
-            '₹ / Wp (After GST)',
-            costingResult.perWpAfterGst,
-          ),
+          _summaryRow('₹ / Wp (Before GST)', costingResult.perWpBeforeGst),
+          _summaryRow('₹ / Wp (After GST)', costingResult.perWpAfterGst),
         ],
       ),
     );
   }
 
-  Widget _summaryRow(
-    String label,
-    num value, {
-    bool highlight = false,
-  }) {
+  Widget _summaryRow(String label, double value, {bool highlight = false}) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight:
-                  highlight ? FontWeight.w600 : FontWeight.normal,
-            ),
-          ),
+          Text(label,
+              style: TextStyle(
+                  fontWeight:
+                      highlight ? FontWeight.w600 : FontWeight.normal)),
           Text(
             '₹ ${value.toStringAsFixed(2)}',
             style: TextStyle(
@@ -750,11 +611,8 @@ void initState() {
       child: TextField(
         keyboardType: TextInputType.number,
         decoration: InputDecoration(labelText: label),
-        controller:
-            TextEditingController(text: value.toString()),
-        onChanged: (v) {
-          onChanged(double.tryParse(v) ?? 0);
-        },
+        controller: TextEditingController(text: value.toString()),
+        onChanged: (v) => onChanged(double.tryParse(v) ?? 0),
       ),
     );
   }
