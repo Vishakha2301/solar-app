@@ -1,7 +1,14 @@
-import '../../presentation/state/quotation_form_state.dart';
 import 'component_cost.dart';
+import 'component_input_snapshot.dart';
 
+/// A point-in-time snapshot of a completed costing calculation.
+///
+/// Stored as part of [SavedCosting]. Contains both the calculated outputs
+/// (for display) and the original user inputs (for restore/edit).
+///
+/// All fields are immutable doubles — no [num] types.
 class CostingSnapshot {
+  // ── Calculated outputs ────────────────────────────────────────────────────
   final double systemSubTotal;
   final double subsidyProcessingFee;
   final double contingency;
@@ -12,8 +19,13 @@ class CostingSnapshot {
   final double projectCostAfterGst;
   final double perWpAfterGst;
 
+  /// Calculated cost per component, keyed by component key.
   final Map<String, ComponentCost> components;
-  final Map<String, ComponentFormInput> componentInputs;
+
+  // ── User inputs (for restore on edit) ────────────────────────────────────
+  /// The form values the user entered, keyed by component key.
+  /// Uses [ComponentInputSnapshot] — a pure domain type with no UI dependency.
+  final Map<String, ComponentInputSnapshot> componentInputs;
 
   const CostingSnapshot({
     required this.systemSubTotal,
