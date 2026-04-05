@@ -291,13 +291,10 @@ class _CostingPageState extends State<CostingPage> {
           IconButton(
             icon: const Icon(Icons.save),
             onPressed: isProjectCalculated
-                ? () {
+                ? () async {
                     final saved = SavedCosting(
-                      id: (widget.isDuplicate ||
-                              widget.existingCosting == null)
-                          ? DateTime.now()
-                              .millisecondsSinceEpoch
-                              .toString()
+                      id: (widget.isDuplicate || widget.existingCosting == null)
+                          ? ''
                           : widget.existingCosting!.id,
                       createdAt: DateTime.now(),
                       context: CostingContext(
@@ -310,35 +307,36 @@ class _CostingPageState extends State<CostingPage> {
                       ),
                       snapshot: CostingSnapshot(
                         systemSubTotal: costingResult.systemSubTotal,
-                        subsidyProcessingFee:
-                            costingResult.subsidyProcessingFee,
+                        subsidyProcessingFee: costingResult.subsidyProcessingFee,
                         contingency: costingResult.contingency,
                         cp1: costingResult.cp1,
                         cp2: costingResult.cp2,
                         amc: costingResult.amc,
                         grandTotal: costingResult.grandTotal,
-                        projectCostAfterGst:
-                            costingResult.projectCostAfterGst,
+                        projectCostAfterGst: costingResult.projectCostAfterGst,
                         perWpAfterGst: costingResult.perWpAfterGst,
                         components: costingResult.components,
-                        // ← toSnapshot() converts UI ComponentFormInput → domain ComponentInputSnapshot
                         componentInputs: formState.components.map(
-                          (key, input) =>
-                              MapEntry(key, input.toSnapshot()),
+                          (key, input) => MapEntry(key, input.toSnapshot()),
                         ),
                       ),
                     );
 
                     final store = context.read<CostingStore>();
-                    if (widget.isDuplicate ||
-                        widget.existingCosting == null) {
-                      store.addCosting(saved);
-                    } else {
-                      store.updateCosting(
-                          widget.existingCosting!.id, saved);
+                    try {
+                      if (widget.isDuplicate || widget.existingCosting == null) {
+                        await store.addCosting(saved);
+                      } else {
+                        await store.updateCosting(widget.existingCosting!.id, saved);
+                      }
+                      if (context.mounted) Navigator.pop(context);
+                    } catch (e) {
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Save failed: $e')),
+                        );
+                      }
                     }
-
-                    Navigator.pop(context);
                   }
                 : null,
           ),

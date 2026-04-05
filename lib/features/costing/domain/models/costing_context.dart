@@ -14,4 +14,22 @@ class CostingContext {
     required this.roofIdentifier,
     required this.isSubsidyProject,
   });
+
+  Map<String, dynamic> toJson() => {
+        'plantCapacity': plantCapacity,
+        'systemType': systemType,
+        'phaseType': phaseType,
+        'roofType': roofType,
+        'roofIdentifier': roofIdentifier,
+        'isSubsidyProject': isSubsidyProject,
+      };
+
+  factory CostingContext.fromJson(Map<String, dynamic> json) => CostingContext(
+        plantCapacity: (json['plantCapacity'] as num).toDouble(),
+        systemType: json['systemType'] as String,
+        phaseType: json['phaseType'] as String,
+        roofType: json['roofType'] as String,
+        roofIdentifier: json['roofIdentifier'] as String,
+        isSubsidyProject: json['isSubsidyProject'] as bool,
+      );
 }
