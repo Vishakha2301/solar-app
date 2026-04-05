@@ -10,4 +10,18 @@ class ComponentCost {
     required this.unitPrice,
     required this.subTotal,
   });
+
+  Map<String, dynamic> toJson() => {
+        'name': name,
+        'quantity': quantity,
+        'unitPrice': unitPrice,
+        'subTotal': subTotal,
+      };
+
+  factory ComponentCost.fromJson(Map<String, dynamic> json) => ComponentCost(
+        name: json['name'] as String? ?? '',
+        quantity: (json['quantity'] as num?)?.toDouble() ?? 0,
+        unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0,
+        subTotal: (json['subTotal'] as num?)?.toDouble() ?? 0,
+      );
 }

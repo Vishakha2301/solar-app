@@ -1,14 +1,7 @@
 import 'component_cost.dart';
 import 'component_input_snapshot.dart';
 
-/// A point-in-time snapshot of a completed costing calculation.
-///
-/// Stored as part of [SavedCosting]. Contains both the calculated outputs
-/// (for display) and the original user inputs (for restore/edit).
-///
-/// All fields are immutable doubles — no [num] types.
 class CostingSnapshot {
-  // ── Calculated outputs ────────────────────────────────────────────────────
   final double systemSubTotal;
   final double subsidyProcessingFee;
   final double contingency;
@@ -18,13 +11,7 @@ class CostingSnapshot {
   final double grandTotal;
   final double projectCostAfterGst;
   final double perWpAfterGst;
-
-  /// Calculated cost per component, keyed by component key.
   final Map<String, ComponentCost> components;
-
-  // ── User inputs (for restore on edit) ────────────────────────────────────
-  /// The form values the user entered, keyed by component key.
-  /// Uses [ComponentInputSnapshot] — a pure domain type with no UI dependency.
   final Map<String, ComponentInputSnapshot> componentInputs;
 
   const CostingSnapshot({
@@ -40,4 +27,38 @@ class CostingSnapshot {
     required this.components,
     required this.componentInputs,
   });
+
+  Map<String, dynamic> toJson() => {
+        'systemSubTotal': systemSubTotal,
+        'subsidyProcessingFee': subsidyProcessingFee,
+        'contingency': contingency,
+        'cp1': cp1,
+        'cp2': cp2,
+        'amc': amc,
+        'grandTotal': grandTotal,
+        'projectCostAfterGst': projectCostAfterGst,
+        'perWpAfterGst': perWpAfterGst,
+        'components': components.map((k, v) => MapEntry(k, v.toJson())),
+        'componentInputs':
+            componentInputs.map((k, v) => MapEntry(k, v.toJson())),
+      };
+
+  factory CostingSnapshot.fromJson(Map<String, dynamic> json) =>
+    CostingSnapshot(
+      systemSubTotal: (json['systemSubTotal'] as num?)?.toDouble() ?? 0,
+      subsidyProcessingFee: (json['subsidyProcessingFee'] as num?)?.toDouble() ?? 0,
+      contingency: (json['contingency'] as num?)?.toDouble() ?? 0,
+      cp1: (json['cp1'] as num?)?.toDouble() ?? 0,
+      cp2: (json['cp2'] as num?)?.toDouble() ?? 0,
+      amc: (json['amc'] as num?)?.toDouble() ?? 0,
+      grandTotal: (json['grandTotal'] as num?)?.toDouble() ?? 0,
+      projectCostAfterGst: (json['projectCostAfterGst'] as num?)?.toDouble() ?? 0,
+      perWpAfterGst: (json['perWpAfterGst'] as num?)?.toDouble() ?? 0,
+      components: (json['components'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(k, ComponentCost.fromJson(v as Map<String, dynamic>)),
+          ) ?? {},
+      componentInputs: (json['componentInputs'] as Map<String, dynamic>?)?.map(
+            (k, v) => MapEntry(k, ComponentInputSnapshot.fromJson(v as Map<String, dynamic>)),
+          ) ?? {},
+    );
 }

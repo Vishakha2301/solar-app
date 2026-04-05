@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:solar_app/features/costing/presentation/pages/dashboard_page.dart';
-import 'package:solar_app/features/auth/presentation/state/auth_store.dart';
-import 'package:solar_app/features/auth/presentation/pages/login_page.dart';
+
 import 'core/theme/app_theme.dart';
+import 'features/auth/presentation/pages/login_page.dart';
+import 'features/auth/presentation/state/auth_store.dart';
+import 'features/costing/presentation/pages/dashboard_page.dart';
 import 'features/costing/presentation/state/costing_store.dart';
 
 void main() {
@@ -24,26 +25,25 @@ class SolarApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Solar Project App',
+      title: 'Solar ERP',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
-      home: const AuthGuard(),
+      home: const AuthGate(),
     );
   }
 }
 
-class AuthGuard extends StatefulWidget {
-  const AuthGuard({super.key});
+class AuthGate extends StatefulWidget {
+  const AuthGate({super.key});
 
   @override
-  State<AuthGuard> createState() => _AuthGuardState();
+  State<AuthGate> createState() => _AuthGateState();
 }
 
-class _AuthGuardState extends State<AuthGuard> {
+class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // Check if user is logged in when app starts
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<AuthStore>().checkAuthStatus();
     });
@@ -51,21 +51,14 @@ class _AuthGuardState extends State<AuthGuard> {
 
   @override
   Widget build(BuildContext context) {
-    return Consumer<AuthStore>(
-      builder: (context, authStore, _) {
-        switch (authStore.status) {
-          case AuthStatus.authenticated:
-            return const DashboardPage();
-          case AuthStatus.unauthenticated:
-            return const LoginPage();
-          case AuthStatus.unknown:
-            return const Scaffold(
-              body: Center(
-                child: CircularProgressIndicator(),
-              ),
-            );
-        }
-      },
-    );
+    final auth = context.watch<AuthStore>();
+
+    return switch (auth.status) {
+      AuthStatus.unknown => const Scaffold(
+          body: Center(child: CircularProgressIndicator()),
+        ),
+      AuthStatus.authenticated => const DashboardPage(),
+      AuthStatus.unauthenticated => const LoginPage(),
+    };
   }
 }
