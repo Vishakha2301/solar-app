@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'core/navigation/app_shell.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/state/auth_store.dart';
-import 'features/costing/presentation/pages/dashboard_page.dart';
 import 'features/costing/presentation/state/costing_store.dart';
+import 'features/customer/presentation/state/customer_store.dart';
 
 void main() {
   runApp(
@@ -13,6 +14,7 @@ void main() {
       providers: [
         ChangeNotifierProvider(create: (_) => AuthStore()),
         ChangeNotifierProvider(create: (_) => CostingStore()),
+        ChangeNotifierProvider(create: (_) => CustomerStore()),
       ],
       child: const SolarApp(),
     ),
@@ -57,7 +59,7 @@ class _AuthGateState extends State<AuthGate> {
       AuthStatus.unknown => const Scaffold(
           body: Center(child: CircularProgressIndicator()),
         ),
-      AuthStatus.authenticated => const DashboardPage(),
+      AuthStatus.authenticated => const AppShell(),
       AuthStatus.unauthenticated => const LoginPage(),
     };
   }
