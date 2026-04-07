@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../../../features/auth/presentation/state/auth_store.dart';
 import '../../../features/costing/presentation/pages/dashboard_page.dart';
 import '../../../features/customer/presentation/pages/customer_list_page.dart';
+import '../../../features/material/presentation/pages/material_list_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -24,7 +25,7 @@ class _AppShellState extends State<AppShell> {
   final List<Widget> _pages = const [
     DashboardPage(),
     CustomerListPage(),
-    Scaffold(body: Center(child: Text('Materials — coming soon'))),
+    MaterialListPage(),
     Scaffold(body: Center(child: Text('Quotations — coming soon'))),
   ];
 
