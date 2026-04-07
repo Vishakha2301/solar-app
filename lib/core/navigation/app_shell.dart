@@ -4,6 +4,7 @@ import '../../../features/auth/presentation/state/auth_store.dart';
 import '../../../features/costing/presentation/pages/dashboard_page.dart';
 import '../../../features/customer/presentation/pages/customer_list_page.dart';
 import '../../../features/material/presentation/pages/material_list_page.dart';
+import '../../../features/quotation/presentation/pages/quotation_list_page.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -26,6 +27,7 @@ class _AppShellState extends State<AppShell> {
     DashboardPage(),
     CustomerListPage(),
     MaterialListPage(),
+		QuotationListPage(),
     Scaffold(body: Center(child: Text('Quotations — coming soon'))),
   ];
 
