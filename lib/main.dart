@@ -8,6 +8,7 @@ import 'features/auth/presentation/state/auth_store.dart';
 import 'features/costing/presentation/state/costing_store.dart';
 import 'features/customer/presentation/state/customer_store.dart';
 import 'features/material/presentation/state/material_store.dart';
+import 'features/quotation/presentation/state/quotation_store.dart';
 
 void main() {
   runApp(
@@ -17,6 +18,7 @@ void main() {
         ChangeNotifierProvider(create: (_) => CostingStore()),
         ChangeNotifierProvider(create: (_) => CustomerStore()),
         ChangeNotifierProvider(create: (_) => MaterialStore()),
+        ChangeNotifierProvider(create: (_) => QuotationStore()),
       ],
       child: const SolarApp(),
     ),
