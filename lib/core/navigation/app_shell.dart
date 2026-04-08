@@ -120,11 +120,14 @@ class _AppShellState extends State<AppShell> {
         alignment: Alignment.bottomCenter,
         child: Padding(
           padding: const EdgeInsets.only(bottom: 24),
-          child: ListTile(
-            leading: const Icon(Icons.logout, color: Colors.red),
-            title: const Text('Logout',
-                style: TextStyle(color: Colors.red)),
-            onTap: _confirmLogout,
+          child: SizedBox(
+            width: 220,
+            child: ListTile(
+              leading: const Icon(Icons.logout, color: Colors.red),
+              title: const Text('Logout',
+                  style: TextStyle(color: Colors.red)),
+              onTap: _confirmLogout,
+            ),
           ),
         ),
       ),

@@ -359,8 +359,9 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                 .toList(),
             onChanged: (costing) {
               if (costing == null) return;
-              if (_costingSelections
-                  .any((c) => c.costingId == costing.id)) return;
+              if (_costingSelections.any((c) => c.costingId == costing.id)) {
+                return;
+              }
               setState(() {
                 _costingSelections.add(_CostingSelection(
                   costingId: costing.id,

@@ -65,7 +65,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
                       child: FilterChip(
                         label: Text(_statusLabel(status)),
                         selected: store.selectedStatus == status,
-                        selectedColor: _statusColor(status).withOpacity(0.2),
+                        selectedColor: _statusColor(status).withValues(alpha: 0.2),
                         onSelected: (_) => context
                             .read<QuotationStore>()
                             .filterByStatus(status),
@@ -202,10 +202,10 @@ class _QuotationCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: quotation.statusColor.withOpacity(0.15),
+                          color: quotation.statusColor.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: quotation.statusColor.withOpacity(0.4)),
+                              color: quotation.statusColor.withValues(alpha: 0.4)),
                         ),
                         child: Text(
                           quotation.statusLabel,
