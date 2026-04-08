@@ -2,15 +2,33 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../state/quotation_store.dart';
 import '../../domain/models/quotation.dart';
+import '../../../costing/domain/models/saved_costing.dart';
+import '../../../costing/presentation/state/costing_store.dart';
 import 'quotation_form_page.dart';
 
-class QuotationDetailPage extends StatelessWidget {
+class QuotationDetailPage extends StatefulWidget {
   final Quotation quotation;
 
   const QuotationDetailPage({super.key, required this.quotation});
 
   @override
+  State<QuotationDetailPage> createState() => _QuotationDetailPageState();
+}
+
+class _QuotationDetailPageState extends State<QuotationDetailPage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<CostingStore>().loadAll();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final quotation = widget.quotation;
+    final costingStore = context.watch<CostingStore>();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(quotation.quotationNumber),
@@ -27,7 +45,8 @@ class QuotationDetailPage extends StatelessWidget {
                 ),
               ),
             ),
-          if (quotation.status == QuotationStatus.SUBMITTED)
+          if (quotation.status == QuotationStatus.SUBMITTED ||
+              quotation.status == QuotationStatus.REVISED)
             PopupMenuButton<String>(
               onSelected: (value) async {
                 if (value == 'approve') {
@@ -68,8 +87,13 @@ class QuotationDetailPage extends StatelessWidget {
                 _infoRow('Quotation No', quotation.quotationNumber),
                 _infoRow('System Type', quotation.systemType ?? '-'),
                 _infoRow('Validity', '${quotation.validityDays} days'),
-                _infoRow('Created',
-                    _formatDate(quotation.createdAt)),
+                if (quotation.discount > 0)
+                  _infoRow('Discount',
+                      '₹${quotation.discount.toStringAsFixed(0)}'),
+                if (quotation.financingAvailable)
+                  _infoRow('Financing',
+                      '${quotation.financingRate ?? 0}% interest'),
+                _infoRow('Created', _formatDate(quotation.createdAt)),
                 if (quotation.submittedAt != null)
                   _infoRow('Submitted',
                       _formatDate(quotation.submittedAt!)),
@@ -86,12 +110,15 @@ class QuotationDetailPage extends StatelessWidget {
             if (quotation.costings.isNotEmpty)
               _sectionCard(
                 title: 'Costings',
-                children: quotation.costings
-                    .map((c) => _infoRow(
-                          c.roofLabel ?? 'Roof',
-                          c.costingId,
-                        ))
-                    .toList(),
+                children: quotation.costings.map((c) {
+                  final match = costingStore.costings
+                      .where((s) => s.id == c.costingId)
+                      .firstOrNull;
+                  return _infoRow(
+                    c.roofLabel ?? 'Roof',
+                    _buildCostingDisplay(match, c.roofLabel),
+                  );
+                }).toList(),
               ),
             const SizedBox(height: 12),
             if (quotation.instalments.isNotEmpty)
@@ -119,22 +146,12 @@ class QuotationDetailPage extends StatelessWidget {
                           .toList(),
                     ),
                   )),
-            if (quotation.scopeOfWork != null) ...[
+            if (quotation.notes != null) ...[
               const SizedBox(height: 12),
               _sectionCard(
-                title: 'Scope of Work',
+                title: 'Notes',
                 children: [
-                  Text(quotation.scopeOfWork!,
-                      style: const TextStyle(fontSize: 14))
-                ],
-              ),
-            ],
-            if (quotation.termsAndConditions != null) ...[
-              const SizedBox(height: 12),
-              _sectionCard(
-                title: 'Terms & Conditions',
-                children: [
-                  Text(quotation.termsAndConditions!,
+                  Text(quotation.notes!,
                       style: const TextStyle(fontSize: 14))
                 ],
               ),
@@ -144,9 +161,11 @@ class QuotationDetailPage extends StatelessWidget {
               _sectionCard(
                 title: 'Rejection Reason',
                 children: [
-                  Text(quotation.rejectionReason!,
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.red))
+                  Text(
+                    quotation.rejectionReason!,
+                    style: const TextStyle(
+                        fontSize: 14, color: Colors.red),
+                  )
                 ],
               ),
             ],
@@ -155,9 +174,11 @@ class QuotationDetailPage extends StatelessWidget {
               _sectionCard(
                 title: 'Approval Notes',
                 children: [
-                  Text(quotation.approvalNotes!,
-                      style: const TextStyle(
-                          fontSize: 14, color: Colors.green))
+                  Text(
+                    quotation.approvalNotes!,
+                    style: const TextStyle(
+                        fontSize: 14, color: Colors.green),
+                  )
                 ],
               ),
             ],
@@ -172,7 +193,7 @@ class QuotationDetailPage extends StatelessWidget {
                   onPressed: () async {
                     await context
                         .read<QuotationStore>()
-                        .submit(quotation.id);
+                        .submit(widget.quotation.id);
                     if (context.mounted) Navigator.pop(context);
                   },
                 ),
@@ -183,14 +204,26 @@ class QuotationDetailPage extends StatelessWidget {
     );
   }
 
+  String _buildCostingDisplay(
+      SavedCosting? costing, String? roofLabel) {
+    if (costing == null) {
+      return roofLabel ?? 'Loading...';
+    }
+    return '${costing.context.roofIdentifier} — '
+        '${costing.context.plantCapacity} kWp — '
+        '₹${costing.snapshot.grandTotal.toStringAsFixed(0)}';
+  }
+
   Widget _statusBanner(Quotation quotation) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding:
+          const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: quotation.statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: quotation.statusColor.withValues(alpha: 0.3)),
+        border: Border.all(
+            color: quotation.statusColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -251,7 +284,8 @@ class QuotationDetailPage extends StatelessWidget {
             width: 140,
             child: Text(
               label,
-              style: const TextStyle(color: Colors.grey, fontSize: 13),
+              style:
+                  const TextStyle(color: Colors.grey, fontSize: 13),
             ),
           ),
           Expanded(
@@ -297,7 +331,7 @@ class QuotationDetailPage extends StatelessWidget {
     );
     if (confirm == true && context.mounted) {
       await context.read<QuotationStore>().approve(
-            quotation.id,
+            widget.quotation.id,
             notesController.text.trim().isEmpty
                 ? null
                 : notesController.text.trim(),
@@ -326,7 +360,8 @@ class QuotationDetailPage extends StatelessWidget {
             child: const Text('Cancel'),
           ),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Reject'),
           ),
@@ -341,9 +376,10 @@ class QuotationDetailPage extends StatelessWidget {
         );
         return;
       }
-      await context
-          .read<QuotationStore>()
-          .reject(quotation.id, reasonController.text.trim());
+      await context.read<QuotationStore>().reject(
+            widget.quotation.id,
+            reasonController.text.trim(),
+          );
       if (context.mounted) Navigator.pop(context);
     }
   }

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../state/quotation_store.dart';
 import '../../domain/models/quotation.dart';
 import '../../../customer/domain/models/customer.dart';
-import '../../../customer/domain/models/customer_site.dart';
 import '../../../customer/presentation/state/customer_store.dart';
 import '../../../customer/presentation/pages/customer_form_page.dart';
 import '../../../costing/domain/models/saved_costing.dart';
@@ -24,23 +23,20 @@ class QuotationFormPage extends StatefulWidget {
 class _QuotationFormPageState extends State<QuotationFormPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
-
   int _currentStep = 0;
 
-  // Step 1 — Customer
-  Customer? _selectedCustomer;
-  CustomerSite? _selectedSite;
-  String? _existingCustomerId;
-  String? _existingCustomerSiteId;
+  // Step 1 — Customer — stored as IDs only
+  String? _selectedCustomerId;
+  String? _selectedSiteId;
 
   // Step 2 — Costing
   final List<_CostingSelection> _costingSelections = [];
 
-  // Step 3 — Components
+  // Step 3 — Components — stored as IDs only
   String? _systemType;
-  MaterialItem? _panelMaterial;
-  MaterialItem? _inverterMaterial;
-  MaterialItem? _cableMaterial;
+  String? _panelMaterialId;
+  String? _inverterMaterialId;
+  String? _cableMaterialId;
 
   // Step 4 — Terms
   final _notesController = TextEditingController();
@@ -70,22 +66,39 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 
   void _populateFromExisting() {
     final q = widget.existingQuotation!;
-    _existingCustomerId = q.customer.id;
-    _existingCustomerSiteId = q.customerSite?.id;
+    _selectedCustomerId = q.customer.id;
+    _selectedSiteId = q.customerSite?.id;
     _systemType = q.systemType;
     _notesController.text = q.notes ?? '';
     _validityController.text = q.validityDays.toString();
     _discountController.text = q.discount.toString();
     _financingAvailable = q.financingAvailable;
     _financingRateController.text = q.financingRate?.toString() ?? '';
+
     _costingSelections.addAll(q.costings.map((c) => _CostingSelection(
-          costingId: c.costingId,
-          roofLabel: c.roofLabel ?? '',
-        )));
+      costingId: c.costingId,
+      roofLabel: c.roofLabel ?? '',
+      displayLabel: '',
+      isSubsidyProject: false, // resolved later from costing store
+      subsidyAmount: c.subsidyAmount?.toStringAsFixed(0) ?? '0',
+    )));
+
     _instalments.addAll(q.instalments.map((i) => _InstalmentRow(
           description: i.description,
           percentage: i.percentage.toString(),
         )));
+
+    for (final pkg in q.packages) {
+      for (final m in pkg.materials) {
+        if (m.componentKey == 'solarPanel') {
+          _panelMaterialId = m.material.id;
+        } else if (m.componentKey == 'invertor') {
+          _inverterMaterialId = m.material.id;
+        } else if (m.componentKey == 'dcCable') {
+          _cableMaterialId = m.material.id;
+        }
+      }
+    }
   }
 
   void _addDefaultInstalments() {
@@ -106,9 +119,12 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
     super.dispose();
   }
 
+  Customer? _resolveCustomer(List<Customer> customers) =>
+      customers.where((c) => c.id == _selectedCustomerId).firstOrNull;
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedCustomer == null) {
+    if (_selectedCustomerId == null) {
       _showError('Please select a customer');
       return;
     }
@@ -120,23 +136,23 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
     setState(() => _isSaving = true);
 
     final materials = <Map<String, dynamic>>[];
-    if (_panelMaterial != null) {
+    if (_panelMaterialId != null) {
       materials.add({
-        'materialId': _panelMaterial!.id,
+        'materialId': _panelMaterialId,
         'componentKey': 'solarPanel',
         'isRecommended': true,
       });
     }
-    if (_inverterMaterial != null) {
+    if (_inverterMaterialId != null) {
       materials.add({
-        'materialId': _inverterMaterial!.id,
+        'materialId': _inverterMaterialId,
         'componentKey': 'invertor',
         'isRecommended': true,
       });
     }
-    if (_cableMaterial != null) {
+    if (_cableMaterialId != null) {
       materials.add({
-        'materialId': _cableMaterial!.id,
+        'materialId': _cableMaterialId,
         'componentKey': 'dcCable',
         'isRecommended': true,
       });
@@ -152,8 +168,8 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
     }
 
     final request = {
-      'customerId': _selectedCustomer!.id,
-      'customerSiteId': _selectedSite?.id,
+      'customerId': _selectedCustomerId,
+      'customerSiteId': _selectedSiteId,
       'systemType': _systemType,
       'validityDays': int.tryParse(_validityController.text) ?? 30,
       'discount': double.tryParse(_discountController.text) ?? 0,
@@ -252,35 +268,15 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 
   Step _buildCustomerStep() {
     final customerStore = context.watch<CustomerStore>();
-
-    // Resolve selected customer from loaded list by ID
-    if (_existingCustomerId != null &&
-        _selectedCustomer == null &&
-        customerStore.customers.isNotEmpty) {
-      final match = customerStore.customers
-          .where((c) => c.id == _existingCustomerId)
-          .toList();
-      if (match.isNotEmpty) {
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          setState(() {
-            _selectedCustomer = match.first;
-            _selectedSite = _existingCustomerSiteId != null
-                ? match.first.sites
-                    .where((s) => s.id == _existingCustomerSiteId)
-                    .firstOrNull
-                : null;
-          });
-        });
-      }
-    }
+    final resolvedCustomer = _resolveCustomer(customerStore.customers);
 
     return Step(
       title: const Text('Customer'),
-      subtitle: _selectedCustomer != null
-          ? Text(_selectedCustomer!.displayName)
+      subtitle: resolvedCustomer != null
+          ? Text(resolvedCustomer.displayName)
           : null,
       isActive: _currentStep >= 0,
-      state: _selectedCustomer != null
+      state: resolvedCustomer != null
           ? StepState.complete
           : StepState.indexed,
       content: Column(
@@ -289,8 +285,11 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
           Row(
             children: [
               Expanded(
-                child: DropdownButtonFormField<Customer>(
-                  value: _selectedCustomer,
+                child: DropdownButtonFormField<String>(
+                  value: customerStore.customers
+                          .any((c) => c.id == _selectedCustomerId)
+                      ? _selectedCustomerId
+                      : null,
                   decoration: const InputDecoration(
                     labelText: 'Select Customer *',
                     border: OutlineInputBorder(),
@@ -298,19 +297,23 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                   ),
                   items: customerStore.customers
                       .map((c) => DropdownMenuItem(
-                            value: c,
+                            value: c.id,
                             child: Text(c.displayName),
                           ))
                       .toList(),
                   onChanged: (value) => setState(() {
-                    _selectedCustomer = value;
-                    _existingCustomerId = null;
-                    _selectedSite = value?.sites.isNotEmpty == true
-                        ? value!.sites.firstWhere(
-                            (s) => s.isDefault,
-                            orElse: () => value.sites.first,
-                          )
-                        : null;
+                    _selectedCustomerId = value;
+                    final customer = customerStore.customers
+                        .where((c) => c.id == value)
+                        .firstOrNull;
+                    _selectedSiteId =
+                        customer?.sites.isNotEmpty == true
+                            ? (customer!.sites
+                                    .where((s) => s.isDefault)
+                                    .firstOrNull
+                                    ?.id ??
+                                customer.sites.first.id)
+                            : null;
                   }),
                   validator: (v) => v == null ? 'Required' : null,
                 ),
@@ -320,15 +323,15 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                 tooltip: 'Add New Customer',
                 icon: const Icon(Icons.person_add_outlined),
                 style: IconButton.styleFrom(
-                  backgroundColor:
-                      Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                  backgroundColor: Theme.of(context)
+                      .primaryColor
+                      .withValues(alpha: 0.1),
                 ),
                 onPressed: () async {
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
-                      builder: (_) => const CustomerFormPage(),
-                    ),
+                        builder: (_) => const CustomerFormPage()),
                   );
                   if (context.mounted) {
                     await context.read<CustomerStore>().loadAll();
@@ -337,24 +340,27 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
               ),
             ],
           ),
-          if (_selectedCustomer != null &&
-              _selectedCustomer!.sites.isNotEmpty) ...[
+          if (resolvedCustomer != null &&
+              resolvedCustomer.sites.isNotEmpty) ...[
             const SizedBox(height: 12),
-            DropdownButtonFormField<CustomerSite>(
-              value: _selectedSite,
+            DropdownButtonFormField<String>(
+              value: resolvedCustomer.sites
+                      .any((s) => s.id == _selectedSiteId)
+                  ? _selectedSiteId
+                  : null,
               decoration: const InputDecoration(
                 labelText: 'Installation Site',
                 border: OutlineInputBorder(),
                 prefixIcon: Icon(Icons.location_on_outlined),
               ),
-              items: _selectedCustomer!.sites
+              items: resolvedCustomer.sites
                   .map((s) => DropdownMenuItem(
-                        value: s,
+                        value: s.id,
                         child: Text(s.siteLabel),
                       ))
                   .toList(),
               onChanged: (value) =>
-                  setState(() => _selectedSite = value),
+                  setState(() => _selectedSiteId = value),
             ),
           ],
         ],
@@ -364,6 +370,27 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 
   Step _buildCostingStep() {
     final costingStore = context.watch<CostingStore>();
+
+    // Resolve display labels and subsidy flag from loaded costings
+    for (final selection in _costingSelections) {
+      final match = costingStore.costings
+          .where((c) => c.id == selection.costingId)
+          .firstOrNull;
+      if (match != null) {
+        if (selection.displayLabel.isEmpty) {
+          selection.displayLabel =
+              '${match.context.roofIdentifier} — '
+              '${match.context.plantCapacity} kWp — '
+              '₹${match.snapshot.grandTotal.toStringAsFixed(0)}';
+        }
+        // Update subsidy flag from loaded costing
+        if (match.context.isSubsidyProject != selection.isSubsidyProject) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() {});
+          });
+        }
+      }
+    }
 
     return Step(
       title: const Text('Costing'),
@@ -389,7 +416,8 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                       child: Text(
                         '${c.context.roofIdentifier} — '
                         '${c.context.plantCapacity} kWp — '
-                        '₹${c.snapshot.grandTotal.toStringAsFixed(0)}',
+                        '₹${c.snapshot.grandTotal.toStringAsFixed(0)}'
+                        '${c.context.isSubsidyProject ? ' 🏛 Subsidy' : ''}',
                       ),
                     ))
                 .toList(),
@@ -407,6 +435,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                       '${costing.context.roofIdentifier} — '
                       '${costing.context.plantCapacity} kWp — '
                       '₹${costing.snapshot.grandTotal.toStringAsFixed(0)}',
+                  isSubsidyProject: costing.context.isSubsidyProject,
                 ));
                 _systemType ??=
                     '${costing.context.systemType} ${costing.context.plantCapacity}KW';
@@ -417,19 +446,75 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
           ..._costingSelections.asMap().entries.map((entry) {
             final index = entry.key;
             final selection = entry.value;
+
+            // Resolve isSubsidyProject from loaded costings
+            final match = costingStore.costings
+                .where((c) => c.id == selection.costingId)
+                .firstOrNull;
+            final isSubsidy = match?.context.isSubsidyProject ?? selection.isSubsidyProject;
+
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                leading: const Icon(Icons.calculate_outlined,
-                    color: Colors.green),
-                title: Text(selection.displayLabel.isNotEmpty
-                    ? selection.displayLabel
-                    : selection.roofLabel),
-                trailing: IconButton(
-                  icon: const Icon(Icons.remove_circle_outline,
-                      color: Colors.red),
-                  onPressed: () => setState(
-                      () => _costingSelections.removeAt(index)),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.calculate_outlined,
+                            color: Colors.green, size: 20),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            selection.displayLabel.isNotEmpty
+                                ? selection.displayLabel
+                                : selection.roofLabel.isNotEmpty
+                                    ? selection.roofLabel
+                                    : 'Costing ${index + 1}',
+                            style: const TextStyle(
+                                fontWeight: FontWeight.w500),
+                          ),
+                        ),
+                        if (isSubsidy)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(
+                                  color: Colors.blue.shade200),
+                            ),
+                            child: const Text(
+                              'Subsidy',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.blue),
+                            ),
+                          ),
+                        IconButton(
+                          icon: const Icon(
+                              Icons.remove_circle_outline,
+                              color: Colors.red),
+                          onPressed: () => setState(
+                              () => _costingSelections.removeAt(index)),
+                        ),
+                      ],
+                    ),
+                    if (isSubsidy) ...[
+                      const SizedBox(height: 8),
+                      TextFormField(
+                        controller: selection.subsidyController,
+                        decoration: const InputDecoration(
+                          labelText: 'Subsidy Amount',
+                          hintText: 'e.g. 78000',
+                          border: OutlineInputBorder(),
+                          prefixText: '₹ ',
+                        ),
+                        keyboardType: TextInputType.number,
+                      ),
+                    ],
+                  ],
                 ),
               ),
             );
@@ -448,7 +533,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       ),
     );
   }
-
+  
   Step _buildComponentsStep() {
     final materialStore = context.watch<MaterialStore>();
 
@@ -462,6 +547,13 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
         .where((m) => m.category.value == 'CABLE')
         .toList();
 
+    final panelValue =
+        panels.where((m) => m.id == _panelMaterialId).firstOrNull;
+    final inverterValue =
+        inverters.where((m) => m.id == _inverterMaterialId).firstOrNull;
+    final cableValue =
+        cables.where((m) => m.id == _cableMaterialId).firstOrNull;
+
     return Step(
       title: const Text('Components'),
       subtitle: const Text('Select brands (optional)'),
@@ -473,14 +565,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             label: 'Solar Panel Brand',
             icon: Icons.solar_power,
             items: panels,
-            value: _panelMaterial,
-            onChanged: (v) => setState(() => _panelMaterial = v),
+            value: panelValue,
+            onChanged: (v) =>
+                setState(() => _panelMaterialId = v?.id),
             onAdd: () async {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MaterialFormPage(),
-                ),
+                    builder: (_) => const MaterialFormPage()),
               );
               if (context.mounted) {
                 await context.read<MaterialStore>().loadAll();
@@ -492,14 +584,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             label: 'Inverter Brand',
             icon: Icons.electric_bolt,
             items: inverters,
-            value: _inverterMaterial,
-            onChanged: (v) => setState(() => _inverterMaterial = v),
+            value: inverterValue,
+            onChanged: (v) =>
+                setState(() => _inverterMaterialId = v?.id),
             onAdd: () async {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MaterialFormPage(),
-                ),
+                    builder: (_) => const MaterialFormPage()),
               );
               if (context.mounted) {
                 await context.read<MaterialStore>().loadAll();
@@ -511,14 +603,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             label: 'Cable Brand',
             icon: Icons.cable,
             items: cables,
-            value: _cableMaterial,
-            onChanged: (v) => setState(() => _cableMaterial = v),
+            value: cableValue,
+            onChanged: (v) =>
+                setState(() => _cableMaterialId = v?.id),
             onAdd: () async {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const MaterialFormPage(),
-                ),
+                    builder: (_) => const MaterialFormPage()),
               );
               if (context.mounted) {
                 await context.read<MaterialStore>().loadAll();
@@ -564,8 +656,9 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
           tooltip: 'Add New Material',
           icon: const Icon(Icons.add_circle_outline),
           style: IconButton.styleFrom(
-            backgroundColor:
-                Theme.of(context).primaryColor.withValues(alpha: 0.1),
+            backgroundColor: Theme.of(context)
+                .primaryColor
+                .withValues(alpha: 0.1),
           ),
           onPressed: onAdd,
         ),
@@ -581,49 +674,56 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextFormField(
-                  controller: _validityController,
-                  decoration: const InputDecoration(
-                    labelText: 'Validity',
-                    border: OutlineInputBorder(),
-                    suffixText: 'days',
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextFormField(
+                    controller: _validityController,
+                    decoration: const InputDecoration(
+                      labelText: 'Validity',
+                      border: OutlineInputBorder(),
+                      suffixText: 'days',
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
-                  keyboardType: TextInputType.number,
                 ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextFormField(
-                  controller: _discountController,
-                  decoration: const InputDecoration(
-                    labelText: 'Discount',
-                    border: OutlineInputBorder(),
-                    prefixText: '₹ ',
+                const SizedBox(width: 12),
+                Expanded(
+                  child: TextFormField(
+                    controller: _discountController,
+                    decoration: const InputDecoration(
+                      labelText: 'Discount',
+                      border: OutlineInputBorder(),
+                      prefixText: '₹ ',
+                    ),
+                    keyboardType: TextInputType.number,
                   ),
-                  keyboardType: TextInputType.number,
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 12),
           SwitchListTile(
             title: const Text('Financing Available'),
             value: _financingAvailable,
-            onChanged: (v) => setState(() => _financingAvailable = v),
+            onChanged: (v) =>
+                setState(() => _financingAvailable = v),
             contentPadding: EdgeInsets.zero,
           ),
           if (_financingAvailable) ...[
-            TextFormField(
-              controller: _financingRateController,
-              decoration: const InputDecoration(
-                labelText: 'Interest Rate',
-                border: OutlineInputBorder(),
-                suffixText: '%',
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 200),
+              child: TextFormField(
+                controller: _financingRateController,
+                decoration: const InputDecoration(
+                  labelText: 'Interest Rate',
+                  border: OutlineInputBorder(),
+                  suffixText: '%',
+                ),
+                keyboardType: TextInputType.number,
               ),
-              keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
           ],
@@ -646,8 +746,8 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                     fontWeight: FontWeight.bold, fontSize: 15),
               ),
               TextButton.icon(
-                onPressed: () =>
-                    setState(() => _instalments.add(_InstalmentRow())),
+                onPressed: () => setState(
+                    () => _instalments.add(_InstalmentRow())),
                 icon: const Icon(Icons.add),
                 label: const Text('Add'),
               ),
@@ -704,13 +804,17 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 class _CostingSelection {
   final String costingId;
   final String roofLabel;
-  final String displayLabel;
+  String displayLabel;
+  final bool isSubsidyProject;
+  final TextEditingController subsidyController;
 
   _CostingSelection({
     required this.costingId,
     required this.roofLabel,
     this.displayLabel = '',
-  });
+    this.isSubsidyProject = false,
+    String subsidyAmount = '0',
+  }) : subsidyController = TextEditingController(text: subsidyAmount);
 }
 
 class _InstalmentRow {
