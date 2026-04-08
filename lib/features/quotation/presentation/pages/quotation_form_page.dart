@@ -5,10 +5,12 @@ import '../../domain/models/quotation.dart';
 import '../../../customer/domain/models/customer.dart';
 import '../../../customer/domain/models/customer_site.dart';
 import '../../../customer/presentation/state/customer_store.dart';
+import '../../../customer/presentation/pages/customer_form_page.dart';
 import '../../../costing/domain/models/saved_costing.dart';
 import '../../../costing/presentation/state/costing_store.dart';
 import '../../../material/domain/models/material_item.dart';
 import '../../../material/presentation/state/material_store.dart';
+import '../../../material/presentation/pages/material_form_page.dart';
 
 class QuotationFormPage extends StatefulWidget {
   final Quotation? existingQuotation;
@@ -23,12 +25,13 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
   final _formKey = GlobalKey<FormState>();
   bool _isSaving = false;
 
-  // Step tracking
   int _currentStep = 0;
 
   // Step 1 — Customer
   Customer? _selectedCustomer;
   CustomerSite? _selectedSite;
+  String? _existingCustomerId;
+  String? _existingCustomerSiteId;
 
   // Step 2 — Costing
   final List<_CostingSelection> _costingSelections = [];
@@ -40,9 +43,6 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
   MaterialItem? _cableMaterial;
 
   // Step 4 — Terms
-  final _scopeController = TextEditingController();
-  final _paymentTermsController = TextEditingController();
-  final _termsController = TextEditingController();
   final _notesController = TextEditingController();
   final _validityController = TextEditingController(text: '30');
   final _discountController = TextEditingController(text: '0');
@@ -70,12 +70,9 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 
   void _populateFromExisting() {
     final q = widget.existingQuotation!;
-    _selectedCustomer = q.customer;
-    _selectedSite = q.customerSite;
+    _existingCustomerId = q.customer.id;
+    _existingCustomerSiteId = q.customerSite?.id;
     _systemType = q.systemType;
-    _scopeController.text = q.scopeOfWork ?? '';
-    _paymentTermsController.text = q.paymentTerms ?? '';
-    _termsController.text = q.termsAndConditions ?? '';
     _notesController.text = q.notes ?? '';
     _validityController.text = q.validityDays.toString();
     _discountController.text = q.discount.toString();
@@ -102,9 +99,6 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 
   @override
   void dispose() {
-    _scopeController.dispose();
-    _paymentTermsController.dispose();
-    _termsController.dispose();
     _notesController.dispose();
     _validityController.dispose();
     _discountController.dispose();
@@ -125,8 +119,6 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 
     setState(() => _isSaving = true);
 
-    // Build packages from selected materials
-    final packages = <Map<String, dynamic>>[];
     final materials = <Map<String, dynamic>>[];
     if (_panelMaterial != null) {
       materials.add({
@@ -149,6 +141,8 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
         'isRecommended': true,
       });
     }
+
+    final packages = <Map<String, dynamic>>[];
     if (materials.isNotEmpty) {
       packages.add({
         'packageName': 'Standard',
@@ -163,23 +157,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       'systemType': _systemType,
       'validityDays': int.tryParse(_validityController.text) ?? 30,
       'discount': double.tryParse(_discountController.text) ?? 0,
-      'scopeOfWork': _scopeController.text.trim().isEmpty
-          ? null
-          : _scopeController.text.trim(),
-      'paymentTerms': _paymentTermsController.text.trim().isEmpty
-          ? null
-          : _paymentTermsController.text.trim(),
-      'termsAndConditions': _termsController.text.trim().isEmpty
-          ? null
-          : _termsController.text.trim(),
       'notes': _notesController.text.trim().isEmpty
           ? null
           : _notesController.text.trim(),
       'financingAvailable': _financingAvailable,
-      'financingRate': _financingAvailable &&
-              _financingRateController.text.isNotEmpty
-          ? double.tryParse(_financingRateController.text)
-          : null,
+      'financingRate':
+          _financingAvailable && _financingRateController.text.isNotEmpty
+              ? double.tryParse(_financingRateController.text)
+              : null,
       'costings': _costingSelections
           .map((c) => {
                 'costingId': c.costingId,
@@ -268,6 +253,27 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
   Step _buildCustomerStep() {
     final customerStore = context.watch<CustomerStore>();
 
+    // Resolve selected customer from loaded list by ID
+    if (_existingCustomerId != null &&
+        _selectedCustomer == null &&
+        customerStore.customers.isNotEmpty) {
+      final match = customerStore.customers
+          .where((c) => c.id == _existingCustomerId)
+          .toList();
+      if (match.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          setState(() {
+            _selectedCustomer = match.first;
+            _selectedSite = _existingCustomerSiteId != null
+                ? match.first.sites
+                    .where((s) => s.id == _existingCustomerSiteId)
+                    .firstOrNull
+                : null;
+          });
+        });
+      }
+    }
+
     return Step(
       title: const Text('Customer'),
       subtitle: _selectedCustomer != null
@@ -280,29 +286,56 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       content: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          DropdownButtonFormField<Customer>(
-            value: _selectedCustomer,
-            decoration: const InputDecoration(
-              labelText: 'Select Customer *',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-            items: customerStore.customers
-                .map((c) => DropdownMenuItem(
-                      value: c,
-                      child: Text(c.displayName),
-                    ))
-                .toList(),
-            onChanged: (value) => setState(() {
-              _selectedCustomer = value;
-              _selectedSite = value?.sites.isNotEmpty == true
-                  ? value!.sites.firstWhere(
-                      (s) => s.isDefault,
-                      orElse: () => value.sites.first,
-                    )
-                  : null;
-            }),
-            validator: (v) => v == null ? 'Required' : null,
+          Row(
+            children: [
+              Expanded(
+                child: DropdownButtonFormField<Customer>(
+                  value: _selectedCustomer,
+                  decoration: const InputDecoration(
+                    labelText: 'Select Customer *',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  items: customerStore.customers
+                      .map((c) => DropdownMenuItem(
+                            value: c,
+                            child: Text(c.displayName),
+                          ))
+                      .toList(),
+                  onChanged: (value) => setState(() {
+                    _selectedCustomer = value;
+                    _existingCustomerId = null;
+                    _selectedSite = value?.sites.isNotEmpty == true
+                        ? value!.sites.firstWhere(
+                            (s) => s.isDefault,
+                            orElse: () => value.sites.first,
+                          )
+                        : null;
+                  }),
+                  validator: (v) => v == null ? 'Required' : null,
+                ),
+              ),
+              const SizedBox(width: 8),
+              IconButton(
+                tooltip: 'Add New Customer',
+                icon: const Icon(Icons.person_add_outlined),
+                style: IconButton.styleFrom(
+                  backgroundColor:
+                      Theme.of(context).primaryColor.withValues(alpha: 0.1),
+                ),
+                onPressed: () async {
+                  await Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const CustomerFormPage(),
+                    ),
+                  );
+                  if (context.mounted) {
+                    await context.read<CustomerStore>().loadAll();
+                  }
+                },
+              ),
+            ],
           ),
           if (_selectedCustomer != null &&
               _selectedCustomer!.sites.isNotEmpty) ...[
@@ -354,18 +387,26 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                 .map((c) => DropdownMenuItem(
                       value: c,
                       child: Text(
-                          '${c.context.roofIdentifier} — ${c.context.plantCapacity} kWp'),
+                        '${c.context.roofIdentifier} — '
+                        '${c.context.plantCapacity} kWp — '
+                        '₹${c.snapshot.grandTotal.toStringAsFixed(0)}',
+                      ),
                     ))
                 .toList(),
             onChanged: (costing) {
               if (costing == null) return;
-              if (_costingSelections.any((c) => c.costingId == costing.id)) {
+              if (_costingSelections
+                  .any((c) => c.costingId == costing.id)) {
                 return;
               }
               setState(() {
                 _costingSelections.add(_CostingSelection(
                   costingId: costing.id,
                   roofLabel: costing.context.roofIdentifier,
+                  displayLabel:
+                      '${costing.context.roofIdentifier} — '
+                      '${costing.context.plantCapacity} kWp — '
+                      '₹${costing.snapshot.grandTotal.toStringAsFixed(0)}',
                 ));
                 _systemType ??=
                     '${costing.context.systemType} ${costing.context.plantCapacity}KW';
@@ -379,11 +420,11 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             return Card(
               margin: const EdgeInsets.only(bottom: 8),
               child: ListTile(
-                title: Text(selection.roofLabel.isEmpty
-                    ? 'Costing ${index + 1}'
+                leading: const Icon(Icons.calculate_outlined,
+                    color: Colors.green),
+                title: Text(selection.displayLabel.isNotEmpty
+                    ? selection.displayLabel
                     : selection.roofLabel),
-                subtitle: Text(selection.costingId,
-                    style: const TextStyle(fontSize: 11)),
                 trailing: IconButton(
                   icon: const Icon(Icons.remove_circle_outline,
                       color: Colors.red),
@@ -428,58 +469,107 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       state: StepState.indexed,
       content: Column(
         children: [
-          DropdownButtonFormField<MaterialItem>(
+          _materialDropdown(
+            label: 'Solar Panel Brand',
+            icon: Icons.solar_power,
+            items: panels,
             value: _panelMaterial,
-            decoration: const InputDecoration(
-              labelText: 'Solar Panel Brand',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.solar_power),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('— None —')),
-              ...panels.map((m) => DropdownMenuItem(
-                    value: m,
-                    child: Text('${m.brandName} ${m.modelName}'),
-                  )),
-            ],
             onChanged: (v) => setState(() => _panelMaterial = v),
+            onAdd: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MaterialFormPage(),
+                ),
+              );
+              if (context.mounted) {
+                await context.read<MaterialStore>().loadAll();
+              }
+            },
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<MaterialItem>(
+          _materialDropdown(
+            label: 'Inverter Brand',
+            icon: Icons.electric_bolt,
+            items: inverters,
             value: _inverterMaterial,
-            decoration: const InputDecoration(
-              labelText: 'Inverter Brand',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.electric_bolt),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('— None —')),
-              ...inverters.map((m) => DropdownMenuItem(
-                    value: m,
-                    child: Text('${m.brandName} ${m.modelName}'),
-                  )),
-            ],
             onChanged: (v) => setState(() => _inverterMaterial = v),
+            onAdd: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MaterialFormPage(),
+                ),
+              );
+              if (context.mounted) {
+                await context.read<MaterialStore>().loadAll();
+              }
+            },
           ),
           const SizedBox(height: 12),
-          DropdownButtonFormField<MaterialItem>(
+          _materialDropdown(
+            label: 'Cable Brand',
+            icon: Icons.cable,
+            items: cables,
             value: _cableMaterial,
-            decoration: const InputDecoration(
-              labelText: 'Cable Brand',
-              border: OutlineInputBorder(),
-              prefixIcon: Icon(Icons.cable),
-            ),
-            items: [
-              const DropdownMenuItem(value: null, child: Text('— None —')),
-              ...cables.map((m) => DropdownMenuItem(
-                    value: m,
-                    child: Text('${m.brandName} ${m.modelName}'),
-                  )),
-            ],
             onChanged: (v) => setState(() => _cableMaterial = v),
+            onAdd: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const MaterialFormPage(),
+                ),
+              );
+              if (context.mounted) {
+                await context.read<MaterialStore>().loadAll();
+              }
+            },
           ),
         ],
       ),
+    );
+  }
+
+  Widget _materialDropdown({
+    required String label,
+    required IconData icon,
+    required List<MaterialItem> items,
+    required MaterialItem? value,
+    required ValueChanged<MaterialItem?> onChanged,
+    required VoidCallback onAdd,
+  }) {
+    return Row(
+      children: [
+        Expanded(
+          child: DropdownButtonFormField<MaterialItem>(
+            value: value,
+            decoration: InputDecoration(
+              labelText: label,
+              border: const OutlineInputBorder(),
+              prefixIcon: Icon(icon),
+            ),
+            items: [
+              const DropdownMenuItem(
+                  value: null, child: Text('— None —')),
+              ...items.map((m) => DropdownMenuItem(
+                    value: m,
+                    child: Text('${m.brandName} ${m.modelName}'),
+                  )),
+            ],
+            onChanged: onChanged,
+          ),
+        ),
+        const SizedBox(width: 8),
+        IconButton(
+          tooltip: 'Add New Material',
+          icon: const Icon(Icons.add_circle_outline),
+          style: IconButton.styleFrom(
+            backgroundColor:
+                Theme.of(context).primaryColor.withValues(alpha: 0.1),
+          ),
+          onPressed: onAdd,
+        ),
+      ],
     );
   }
 
@@ -497,8 +587,9 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                 child: TextFormField(
                   controller: _validityController,
                   decoration: const InputDecoration(
-                    labelText: 'Validity (days)',
+                    labelText: 'Validity',
                     border: OutlineInputBorder(),
+                    suffixText: 'days',
                   ),
                   keyboardType: TextInputType.number,
                 ),
@@ -508,8 +599,9 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                 child: TextFormField(
                   controller: _discountController,
                   decoration: const InputDecoration(
-                    labelText: 'Discount (₹)',
+                    labelText: 'Discount',
                     border: OutlineInputBorder(),
+                    prefixText: '₹ ',
                   ),
                   keyboardType: TextInputType.number,
                 ),
@@ -527,51 +619,35 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             TextFormField(
               controller: _financingRateController,
               decoration: const InputDecoration(
-                labelText: 'Interest Rate (%)',
+                labelText: 'Interest Rate',
                 border: OutlineInputBorder(),
+                suffixText: '%',
               ),
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 12),
           ],
           TextFormField(
-            controller: _scopeController,
-            decoration: const InputDecoration(
-              labelText: 'Scope of Work',
-              hintText:
-                  'e.g. System Design, Installation, Net Metering, 5 Years AMC',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _termsController,
-            decoration: const InputDecoration(
-              labelText: 'Terms & Conditions',
-              border: OutlineInputBorder(),
-            ),
-            maxLines: 3,
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
             controller: _notesController,
             decoration: const InputDecoration(
               labelText: 'Notes',
+              hintText: 'Any additional notes for this quotation',
               border: OutlineInputBorder(),
             ),
-            maxLines: 2,
+            maxLines: 3,
           ),
           const SizedBox(height: 16),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Payment Instalments',
-                  style: TextStyle(
-                      fontWeight: FontWeight.bold, fontSize: 15)),
+              const Text(
+                'Payment Instalments',
+                style: TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15),
+              ),
               TextButton.icon(
-                onPressed: () => setState(() =>
-                    _instalments.add(_InstalmentRow())),
+                onPressed: () =>
+                    setState(() => _instalments.add(_InstalmentRow())),
                 icon: const Icon(Icons.add),
                 label: const Text('Add'),
               ),
@@ -596,7 +672,8 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Expanded(
+                  SizedBox(
+                    width: 80,
                     child: TextFormField(
                       controller: row.percentageController,
                       decoration: const InputDecoration(
@@ -627,8 +704,13 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
 class _CostingSelection {
   final String costingId;
   final String roofLabel;
+  final String displayLabel;
 
-  _CostingSelection({required this.costingId, required this.roofLabel});
+  _CostingSelection({
+    required this.costingId,
+    required this.roofLabel,
+    this.displayLabel = '',
+  });
 }
 
 class _InstalmentRow {
