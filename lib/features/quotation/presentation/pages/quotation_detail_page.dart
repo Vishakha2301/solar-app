@@ -4,6 +4,7 @@ import '../state/quotation_store.dart';
 import '../../domain/models/quotation.dart';
 import '../../../costing/domain/models/saved_costing.dart';
 import '../../../costing/presentation/state/costing_store.dart';
+import '../../../../core/services/document_service.dart';
 import 'quotation_form_page.dart';
 
 class QuotationDetailPage extends StatefulWidget {
@@ -16,12 +17,33 @@ class QuotationDetailPage extends StatefulWidget {
 }
 
 class _QuotationDetailPageState extends State<QuotationDetailPage> {
+  final DocumentService _documentService = DocumentService();
+  bool _isDownloading = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CostingStore>().loadAll();
     });
+  }
+
+  Future<void> _downloadDocument() async {
+    setState(() => _isDownloading = true);
+    try {
+      await _documentService.downloadAndOpenQuotation(
+        widget.quotation.id,
+        widget.quotation.quotationNumber,
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Download failed: $e')),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isDownloading = false);
+    }
   }
 
   @override
@@ -33,6 +55,18 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
       appBar: AppBar(
         title: Text(quotation.quotationNumber),
         actions: [
+          IconButton(
+            tooltip: 'Download Quotation',
+            icon: _isDownloading
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: Colors.white),
+                  )
+                : const Icon(Icons.download),
+            onPressed: _isDownloading ? null : _downloadDocument,
+          ),
           if (quotation.status == QuotationStatus.DRAFT ||
               quotation.status == QuotationStatus.REJECTED)
             IconButton(
@@ -114,9 +148,19 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
                   final match = costingStore.costings
                       .where((s) => s.id == c.costingId)
                       .firstOrNull;
-                  return _infoRow(
-                    c.roofLabel ?? 'Roof',
-                    _buildCostingDisplay(match, c.roofLabel),
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _infoRow(
+                        c.roofLabel ?? 'Roof',
+                        _buildCostingDisplay(match, c.roofLabel),
+                      ),
+                      if (c.subsidyAmount != null && c.subsidyAmount! > 0)
+                        _infoRow(
+                          'Subsidy',
+                          '₹${c.subsidyAmount!.toStringAsFixed(0)}',
+                        ),
+                    ],
                   );
                 }).toList(),
               ),
@@ -161,11 +205,9 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
               _sectionCard(
                 title: 'Rejection Reason',
                 children: [
-                  Text(
-                    quotation.rejectionReason!,
-                    style: const TextStyle(
-                        fontSize: 14, color: Colors.red),
-                  )
+                  Text(quotation.rejectionReason!,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.red))
                 ],
               ),
             ],
@@ -174,11 +216,9 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
               _sectionCard(
                 title: 'Approval Notes',
                 children: [
-                  Text(
-                    quotation.approvalNotes!,
-                    style: const TextStyle(
-                        fontSize: 14, color: Colors.green),
-                  )
+                  Text(quotation.approvalNotes!,
+                      style: const TextStyle(
+                          fontSize: 14, color: Colors.green))
                 ],
               ),
             ],
@@ -198,6 +238,23 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
                   },
                 ),
               ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                icon: _isDownloading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2),
+                      )
+                    : const Icon(Icons.download),
+                label: const Text('Download Quotation Document'),
+                onPressed: _isDownloading ? null : _downloadDocument,
+              ),
+            ),
+            const SizedBox(height: 32),
           ],
         ),
       ),
@@ -206,9 +263,7 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
 
   String _buildCostingDisplay(
       SavedCosting? costing, String? roofLabel) {
-    if (costing == null) {
-      return roofLabel ?? 'Loading...';
-    }
+    if (costing == null) return roofLabel ?? 'Loading...';
     return '${costing.context.roofIdentifier} — '
         '${costing.context.plantCapacity} kWp — '
         '₹${costing.snapshot.grandTotal.toStringAsFixed(0)}';
@@ -284,8 +339,8 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
             width: 140,
             child: Text(
               label,
-              style:
-                  const TextStyle(color: Colors.grey, fontSize: 13),
+              style: const TextStyle(
+                  color: Colors.grey, fontSize: 13),
             ),
           ),
           Expanded(
