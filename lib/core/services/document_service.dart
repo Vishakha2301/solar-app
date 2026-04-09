@@ -1,8 +1,8 @@
-import 'dart:io';
+import 'dart:typed_data';
 import 'package:dio/dio.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:open_filex/open_filex.dart';
 import '../storage/token_storage.dart';
+import 'document_service_web.dart'
+    if (dart.library.io) 'document_service_mobile.dart';
 
 class DocumentService {
   static const String _baseUrl = 'http://localhost:8080';
@@ -16,30 +16,22 @@ class DocumentService {
   })  : _dio = dio ?? Dio(),
         _tokenStorage = tokenStorage ?? TokenStorage();
 
-  Future<void> downloadAndOpenQuotation(String quotationId,
-      String quotationNumber) async {
+  Future<void> downloadAndOpenQuotation(
+      String quotationId, String quotationNumber) async {
     final token = await _tokenStorage.getToken();
 
     final response = await _dio.get(
       '$_baseUrl/api/v1/quotations/$quotationId/document',
       options: Options(
-        headers: {
-          'Authorization': 'Bearer $token',
-        },
+        headers: {'Authorization': 'Bearer $token'},
         responseType: ResponseType.bytes,
       ),
     );
 
-    // Get temp directory
-    final directory = await getTemporaryDirectory();
-    final filePath =
-        '${directory.path}/$quotationNumber.docx';
+    final bytes = Uint8List.fromList(response.data);
+    final fileName = '$quotationNumber.docx';
 
-    // Write file
-    final file = File(filePath);
-    await file.writeAsBytes(response.data);
-
-    // Open file
-    await OpenFilex.open(filePath);
+    await saveAndOpenFile(bytes, fileName);
   }
 }
+
