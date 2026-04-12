@@ -4,7 +4,6 @@ import '../state/quotation_store.dart';
 import '../../domain/models/quotation.dart';
 import '../../../costing/domain/models/saved_costing.dart';
 import '../../../costing/presentation/state/costing_store.dart';
-import '../../../../core/services/document_service.dart';
 import 'quotation_form_page.dart';
 
 class QuotationDetailPage extends StatefulWidget {
@@ -17,33 +16,12 @@ class QuotationDetailPage extends StatefulWidget {
 }
 
 class _QuotationDetailPageState extends State<QuotationDetailPage> {
-  final DocumentService _documentService = DocumentService();
-  bool _isDownloading = false;
-
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<CostingStore>().loadAll();
     });
-  }
-
-  Future<void> _downloadDocument() async {
-    setState(() => _isDownloading = true);
-    try {
-      await _documentService.downloadAndOpenQuotation(
-        widget.quotation.id,
-        widget.quotation.quotationNumber,
-      );
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Download failed: $e')),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isDownloading = false);
-    }
   }
 
   @override
@@ -55,18 +33,7 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
       appBar: AppBar(
         title: Text(quotation.quotationNumber),
         actions: [
-          IconButton(
-            tooltip: 'Download Quotation',
-            icon: _isDownloading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
-                  )
-                : const Icon(Icons.download),
-            onPressed: _isDownloading ? null : _downloadDocument,
-          ),
+          // Edit only on DRAFT or REJECTED
           if (quotation.status == QuotationStatus.DRAFT ||
               quotation.status == QuotationStatus.REJECTED)
             IconButton(
@@ -79,6 +46,7 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
                 ),
               ),
             ),
+          // Approve/Reject on SUBMITTED or REVISED
           if (quotation.status == QuotationStatus.SUBMITTED ||
               quotation.status == QuotationStatus.REVISED)
             PopupMenuButton<String>(
@@ -126,7 +94,7 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
                       '₹${quotation.discount.toStringAsFixed(0)}'),
                 if (quotation.financingAvailable)
                   _infoRow('Financing',
-                      '${quotation.financingRate ?? 0}% interest'),
+                      '${quotation.financingRate ?? 0}%'),
                 _infoRow('Created', _formatDate(quotation.createdAt)),
                 if (quotation.submittedAt != null)
                   _infoRow('Submitted',
@@ -148,20 +116,9 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
                   final match = costingStore.costings
                       .where((s) => s.id == c.costingId)
                       .firstOrNull;
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _infoRow(
-                        c.roofLabel ?? 'Roof',
-                        _buildCostingDisplay(match, c.roofLabel),
-                      ),
-                      if (c.subsidyAmount != null && c.subsidyAmount! > 0)
-                        _infoRow(
-                          'Subsidy',
-                          '₹${c.subsidyAmount!.toStringAsFixed(0)}',
-                        ),
-                    ],
-                  );
+                  final display =
+                      _buildCostingDisplay(costingStore, match, c.roofLabel);
+                  return _infoRow(c.roofLabel ?? 'Roof', display);
                 }).toList(),
               ),
             const SizedBox(height: 12),
@@ -223,8 +180,9 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
               ),
             ],
             const SizedBox(height: 32),
-            if (quotation.status == QuotationStatus.DRAFT ||
-                quotation.status == QuotationStatus.REJECTED)
+
+            // Submit button — DRAFT only (not REJECTED anymore)
+            if (quotation.status == QuotationStatus.DRAFT)
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -233,28 +191,43 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
                   onPressed: () async {
                     await context
                         .read<QuotationStore>()
-                        .submit(widget.quotation.id);
+                        .submit(quotation.id);
                     if (context.mounted) Navigator.pop(context);
                   },
                 ),
               ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                icon: _isDownloading
-                    ? const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2),
-                      )
-                    : const Icon(Icons.download),
-                label: const Text('Download Quotation Document'),
-                onPressed: _isDownloading ? null : _downloadDocument,
+
+            // REJECTED — Edit & Resubmit OR Cancel
+            if (quotation.status == QuotationStatus.REJECTED) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit & Resubmit'),
+                  onPressed: () => Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          QuotationFormPage(existingQuotation: quotation),
+                    ),
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 32),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  icon: const Icon(Icons.cancel_outlined,
+                      color: Colors.red),
+                  label: const Text('Cancel Quotation',
+                      style: TextStyle(color: Colors.red)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                  onPressed: () => _showCancelDialog(context),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -262,8 +235,10 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
   }
 
   String _buildCostingDisplay(
-      SavedCosting? costing, String? roofLabel) {
-    if (costing == null) return roofLabel ?? 'Loading...';
+      CostingStore store, SavedCosting? costing, String? roofLabel) {
+    if (costing == null) {
+      return store.isLoading ? 'Loading...' : roofLabel ?? 'Unknown costing';
+    }
     return '${costing.context.roofIdentifier} — '
         '${costing.context.plantCapacity} kWp — '
         '₹${costing.snapshot.grandTotal.toStringAsFixed(0)}';
@@ -272,8 +247,7 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
   Widget _statusBanner(Quotation quotation) {
     return Container(
       width: double.infinity,
-      padding:
-          const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+      padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
       decoration: BoxDecoration(
         color: quotation.statusColor.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
@@ -304,6 +278,7 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
         QuotationStatus.APPROVED => Icons.check_circle,
         QuotationStatus.REJECTED => Icons.cancel,
         QuotationStatus.REVISED => Icons.refresh,
+        QuotationStatus.CANCELLED => Icons.block,
       };
 
   Widget _sectionCard(
@@ -314,13 +289,9 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 15,
-              ),
-            ),
+            Text(title,
+                style: const TextStyle(
+                    fontWeight: FontWeight.bold, fontSize: 15)),
             const Divider(),
             ...children,
           ],
@@ -337,26 +308,21 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
         children: [
           SizedBox(
             width: 140,
-            child: Text(
-              label,
-              style: const TextStyle(
-                  color: Colors.grey, fontSize: 13),
-            ),
+            child: Text(label,
+                style:
+                    const TextStyle(color: Colors.grey, fontSize: 13)),
           ),
           Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 13),
-            ),
+            child: Text(value,
+                style: const TextStyle(fontSize: 13)),
           ),
         ],
       ),
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  String _formatDate(DateTime date) =>
+      '${date.day}/${date.month}/${date.year}';
 
   Future<void> _showApproveDialog(BuildContext context) async {
     final notesController = TextEditingController();
@@ -374,19 +340,17 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Approve'),
-          ),
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Approve')),
         ],
       ),
     );
     if (confirm == true && context.mounted) {
       await context.read<QuotationStore>().approve(
-            widget.quotation.id,
+            quotation.id,
             notesController.text.trim().isEmpty
                 ? null
                 : notesController.text.trim(),
@@ -411,12 +375,10 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             onPressed: () => Navigator.pop(context, true),
             child: const Text('Reject'),
           ),
@@ -426,16 +388,44 @@ class _QuotationDetailPageState extends State<QuotationDetailPage> {
     if (confirm == true && context.mounted) {
       if (reasonController.text.trim().isEmpty) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Rejection reason is required')),
+          const SnackBar(content: Text('Rejection reason is required')),
         );
         return;
       }
-      await context.read<QuotationStore>().reject(
-            widget.quotation.id,
-            reasonController.text.trim(),
-          );
+      await context
+          .read<QuotationStore>()
+          .reject(quotation.id, reasonController.text.trim());
       if (context.mounted) Navigator.pop(context);
     }
   }
+
+  Future<void> _showCancelDialog(BuildContext context) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Cancel Quotation'),
+        content: const Text(
+          'Are you sure you want to cancel this quotation? '
+          'This means you will no longer work on this project. '
+          'This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Go Back')),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true && context.mounted) {
+      await context.read<QuotationStore>().cancel(quotation.id);
+      if (context.mounted) Navigator.pop(context);
+    }
+  }
+
+  Quotation get quotation => widget.quotation;
 }
