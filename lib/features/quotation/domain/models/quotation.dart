@@ -1,11 +1,11 @@
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart' show Color, Colors;
 import '../../../customer/domain/models/customer.dart';
 import '../../../customer/domain/models/customer_site.dart';
 import 'quotation_costing.dart';
 import 'quotation_instalment.dart';
 import 'quotation_package.dart';
 
-enum QuotationStatus { DRAFT, SUBMITTED, APPROVED, REJECTED, REVISED }
+enum QuotationStatus { DRAFT, SUBMITTED, APPROVED, REJECTED, REVISED, CANCELLED }
 
 class Quotation {
   final String id;
@@ -65,11 +65,9 @@ class Quotation {
   factory Quotation.fromJson(Map<String, dynamic> json) => Quotation(
         id: json['id'] as String,
         quotationNumber: json['quotationNumber'] as String,
-        customer: Customer.fromJson(
-            json['customer'] as Map<String, dynamic>),
+        customer: Customer.fromJson(json['customer'] as Map<String, dynamic>),
         customerSite: json['customerSite'] != null
-            ? CustomerSite.fromJson(
-                json['customerSite'] as Map<String, dynamic>)
+            ? CustomerSite.fromJson(json['customerSite'] as Map<String, dynamic>)
             : null,
         status: QuotationStatus.values.byName(json['status'] as String),
         systemType: json['systemType'] as String?,
@@ -94,16 +92,13 @@ class Quotation {
         createdAt: DateTime.parse(json['createdAt'] as String),
         updatedAt: DateTime.parse(json['updatedAt'] as String),
         costings: (json['costings'] as List<dynamic>? ?? [])
-            .map((e) =>
-                QuotationCosting.fromJson(e as Map<String, dynamic>))
+            .map((e) => QuotationCosting.fromJson(e as Map<String, dynamic>))
             .toList(),
         instalments: (json['instalments'] as List<dynamic>? ?? [])
-            .map((e) =>
-                QuotationInstalment.fromJson(e as Map<String, dynamic>))
+            .map((e) => QuotationInstalment.fromJson(e as Map<String, dynamic>))
             .toList(),
         packages: (json['packages'] as List<dynamic>? ?? [])
-            .map((e) =>
-                QuotationPackage.fromJson(e as Map<String, dynamic>))
+            .map((e) => QuotationPackage.fromJson(e as Map<String, dynamic>))
             .toList(),
       );
 
@@ -113,6 +108,7 @@ class Quotation {
         QuotationStatus.APPROVED => 'Approved',
         QuotationStatus.REJECTED => 'Rejected',
         QuotationStatus.REVISED => 'Revised',
+        QuotationStatus.CANCELLED => 'Cancelled',
       };
 
   Color get statusColor => switch (status) {
@@ -121,5 +117,6 @@ class Quotation {
         QuotationStatus.APPROVED => const Color(0xFF4CAF50),
         QuotationStatus.REJECTED => const Color(0xFFF44336),
         QuotationStatus.REVISED => const Color(0xFFFF9800),
+        QuotationStatus.CANCELLED => const Color(0xFF607D8B),
       };
 }
