@@ -36,8 +36,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
               await Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const QuotationFormPage(),
-                ),
+                    builder: (_) => const QuotationFormPage()),
               );
             },
           ),
@@ -65,7 +64,8 @@ class _QuotationListPageState extends State<QuotationListPage> {
                       child: FilterChip(
                         label: Text(_statusLabel(status)),
                         selected: store.selectedStatus == status,
-                        selectedColor: _statusColor(status).withValues(alpha: 0.2),
+                        selectedColor:
+                            _statusColor(status).withValues(alpha: 0.2),
                         onSelected: (_) => context
                             .read<QuotationStore>()
                             .filterByStatus(status),
@@ -85,7 +85,6 @@ class _QuotationListPageState extends State<QuotationListPage> {
     if (store.isLoading) {
       return const Center(child: CircularProgressIndicator());
     }
-
     if (store.status == QuotationStoreStatus.error) {
       return Center(
         child: Column(
@@ -103,7 +102,6 @@ class _QuotationListPageState extends State<QuotationListPage> {
         ),
       );
     }
-
     if (store.quotations.isEmpty) {
       return const Center(
         child: Text(
@@ -113,13 +111,11 @@ class _QuotationListPageState extends State<QuotationListPage> {
         ),
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: store.quotations.length,
-      itemBuilder: (context, index) {
-        return _QuotationCard(quotation: store.quotations[index]);
-      },
+      itemBuilder: (context, index) =>
+          _QuotationCard(quotation: store.quotations[index]),
     );
   }
 
@@ -129,6 +125,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
         QuotationStatus.APPROVED => 'Approved',
         QuotationStatus.REJECTED => 'Rejected',
         QuotationStatus.REVISED => 'Revised',
+        QuotationStatus.CANCELLED => 'Cancelled',
       };
 
   Color _statusColor(QuotationStatus status) => switch (status) {
@@ -137,6 +134,7 @@ class _QuotationListPageState extends State<QuotationListPage> {
         QuotationStatus.APPROVED => Colors.green,
         QuotationStatus.REJECTED => Colors.red,
         QuotationStatus.REVISED => Colors.orange,
+        QuotationStatus.CANCELLED => Colors.blueGrey,
       };
 }
 
@@ -154,9 +152,8 @@ class _QuotationCard extends StatelessWidget {
                 'This action cannot be undone. Are you sure?'),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Cancel'),
-              ),
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Cancel')),
               ElevatedButton(
                 style:
                     ElevatedButton.styleFrom(backgroundColor: Colors.red),
@@ -171,6 +168,8 @@ class _QuotationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCancelled = quotation.status == QuotationStatus.CANCELLED;
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
@@ -191,9 +190,13 @@ class _QuotationCard extends StatelessWidget {
                 children: [
                   Text(
                     quotation.quotationNumber,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
+                      color: isCancelled ? Colors.grey : null,
+                      decoration: isCancelled
+                          ? TextDecoration.lineThrough
+                          : null,
                     ),
                   ),
                   Row(
@@ -202,10 +205,12 @@ class _QuotationCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: quotation.statusColor.withValues(alpha: 0.15),
+                          color: quotation.statusColor
+                              .withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: quotation.statusColor.withValues(alpha: 0.4)),
+                              color: quotation.statusColor
+                                  .withValues(alpha: 0.4)),
                         ),
                         child: Text(
                           quotation.statusLabel,
@@ -216,43 +221,50 @@ class _QuotationCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      PopupMenuButton<String>(
-                        onSelected: (value) async {
-                          if (value == 'edit') {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => QuotationFormPage(
-                                    existingQuotation: quotation),
-                              ),
-                            );
-                          } else if (value == 'submit') {
-                            await context
-                                .read<QuotationStore>()
-                                .submit(quotation.id);
-                          } else if (value == 'delete') {
-                            final confirm = await _confirmDelete(context);
-                            if (confirm && context.mounted) {
+                      // No popup menu for cancelled quotations
+                      if (!isCancelled)
+                        PopupMenuButton<String>(
+                          onSelected: (value) async {
+                            if (value == 'edit') {
+                              await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => QuotationFormPage(
+                                      existingQuotation: quotation),
+                                ),
+                              );
+                            } else if (value == 'submit') {
                               await context
                                   .read<QuotationStore>()
-                                  .delete(quotation.id);
+                                  .submit(quotation.id);
+                            } else if (value == 'delete') {
+                              final confirm =
+                                  await _confirmDelete(context);
+                              if (confirm && context.mounted) {
+                                await context
+                                    .read<QuotationStore>()
+                                    .delete(quotation.id);
+                              }
                             }
-                          }
-                        },
-                        itemBuilder: (_) => [
-                          if (quotation.status == QuotationStatus.DRAFT ||
-                              quotation.status == QuotationStatus.REJECTED)
-                            const PopupMenuItem(
-                                value: 'edit', child: Text('Edit')),
-                          if (quotation.status == QuotationStatus.DRAFT ||
-                              quotation.status == QuotationStatus.REJECTED)
-                            const PopupMenuItem(
-                                value: 'submit', child: Text('Submit')),
-                          if (quotation.status == QuotationStatus.DRAFT)
-                            const PopupMenuItem(
-                                value: 'delete', child: Text('Delete')),
-                        ],
-                      ),
+                          },
+                          itemBuilder: (_) => [
+                            if (quotation.status == QuotationStatus.DRAFT ||
+                                quotation.status ==
+                                    QuotationStatus.REJECTED)
+                              const PopupMenuItem(
+                                  value: 'edit', child: Text('Edit')),
+                            if (quotation.status == QuotationStatus.DRAFT ||
+                                quotation.status ==
+                                    QuotationStatus.REJECTED)
+                              const PopupMenuItem(
+                                  value: 'submit',
+                                  child: Text('Submit')),
+                            if (quotation.status == QuotationStatus.DRAFT)
+                              const PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete')),
+                          ],
+                        ),
                     ],
                   ),
                 ],
@@ -260,8 +272,11 @@ class _QuotationCard extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 quotation.customer.displayName,
-                style: const TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w500),
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: isCancelled ? Colors.grey : null,
+                ),
               ),
               const SizedBox(height: 4),
               Row(
@@ -270,24 +285,21 @@ class _QuotationCard extends StatelessWidget {
                     const Icon(Icons.solar_power,
                         size: 14, color: Colors.grey),
                     const SizedBox(width: 4),
-                    Text(
-                      quotation.systemType!,
-                      style: const TextStyle(
-                          fontSize: 13, color: Colors.grey),
-                    ),
+                    Text(quotation.systemType!,
+                        style: const TextStyle(
+                            fontSize: 13, color: Colors.grey)),
                     const SizedBox(width: 12),
                   ],
                   const Icon(Icons.calendar_today,
                       size: 14, color: Colors.grey),
                   const SizedBox(width: 4),
-                  Text(
-                    _formatDate(quotation.createdAt),
-                    style:
-                        const TextStyle(fontSize: 13, color: Colors.grey),
-                  ),
+                  Text(_formatDate(quotation.createdAt),
+                      style: const TextStyle(
+                          fontSize: 13, color: Colors.grey)),
                 ],
               ),
-              if (quotation.rejectionReason != null) ...[
+              if (quotation.rejectionReason != null &&
+                  quotation.status == QuotationStatus.REJECTED) ...[
                 const SizedBox(height: 8),
                 Container(
                   padding: const EdgeInsets.all(8),
@@ -320,7 +332,6 @@ class _QuotationCard extends StatelessWidget {
     );
   }
 
-  String _formatDate(DateTime date) {
-    return '${date.day}/${date.month}/${date.year}';
-  }
+  String _formatDate(DateTime date) =>
+      '${date.day}/${date.month}/${date.year}';
 }
