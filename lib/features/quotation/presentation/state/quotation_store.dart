@@ -63,11 +63,7 @@ class QuotationStore extends ChangeNotifier {
 
   Future<Quotation> update(String id, Map<String, dynamic> request) async {
     final updated = await _repository.update(id, request);
-    final index = _quotations.indexWhere((q) => q.id == id);
-    if (index != -1) {
-      _quotations[index] = updated;
-      notifyListeners();
-    }
+    _updateInList(updated);
     return updated;
   }
 
@@ -85,6 +81,12 @@ class QuotationStore extends ChangeNotifier {
 
   Future<Quotation> reject(String id, String rejectionReason) async {
     final updated = await _repository.reject(id, rejectionReason);
+    _updateInList(updated);
+    return updated;
+  }
+
+  Future<Quotation> cancel(String id) async {
+    final updated = await _repository.cancel(id);
     _updateInList(updated);
     return updated;
   }
