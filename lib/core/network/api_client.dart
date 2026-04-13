@@ -1,9 +1,10 @@
 import 'dart:convert';
+
 import 'package:http/http.dart' as http;
 
-class ApiClient {
-  static const String baseUrl = 'http://localhost:8080';
+import '../config/app_config.dart';
 
+class ApiClient {
   final http.Client _client;
 
   ApiClient({http.Client? client}) : _client = client ?? http.Client();
@@ -19,7 +20,7 @@ class ApiClient {
     };
 
     return _client.post(
-      Uri.parse('$baseUrl$path'),
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
       headers: headers,
       body: jsonEncode(body),
     );
@@ -32,7 +33,18 @@ class ApiClient {
     };
 
     return _client.get(
-      Uri.parse('$baseUrl$path'),
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
+      headers: headers,
+    );
+  }
+
+  Future<http.Response> getBytes(String path, {String? token}) async {
+    final headers = {
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+
+    return _client.get(
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
       headers: headers,
     );
   }
@@ -48,7 +60,7 @@ class ApiClient {
     };
 
     return _client.put(
-      Uri.parse('$baseUrl$path'),
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
       headers: headers,
       body: jsonEncode(body),
     );
@@ -61,7 +73,7 @@ class ApiClient {
     };
 
     return _client.delete(
-      Uri.parse('$baseUrl$path'),
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
       headers: headers,
     );
   }

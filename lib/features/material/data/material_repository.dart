@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_storage.dart';
 import '../domain/models/material_item.dart';
@@ -17,7 +19,7 @@ class MaterialRepository {
 
   Future<List<MaterialItem>> getAll() async {
     final token = await _token;
-    final response = await _apiClient.get('/api/v1/materials', token: token);
+    final response = await _apiClient.get(ApiEndpoints.materials, token: token);
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data
@@ -30,7 +32,7 @@ class MaterialRepository {
   Future<List<MaterialItem>> getByCategory(String category) async {
     final token = await _token;
     final response = await _apiClient.get(
-      '/api/v1/materials/category/$category',
+      ApiEndpoints.materialsByCategory(category),
       token: token,
     );
     if (response.statusCode == 200) {
@@ -45,7 +47,7 @@ class MaterialRepository {
   Future<List<MaterialItem>> getByComponentKey(String componentKey) async {
     final token = await _token;
     final response = await _apiClient.get(
-      '/api/v1/materials/component/$componentKey',
+      ApiEndpoints.materialsByComponentKey(componentKey),
       token: token,
     );
     if (response.statusCode == 200) {
@@ -60,7 +62,7 @@ class MaterialRepository {
   Future<List<MaterialItem>> search(String brandName) async {
     final token = await _token;
     final response = await _apiClient.get(
-      '/api/v1/materials/search?brandName=$brandName',
+      ApiEndpoints.searchMaterials(brandName),
       token: token,
     );
     if (response.statusCode == 200) {
@@ -75,7 +77,7 @@ class MaterialRepository {
   Future<List<MaterialCategoryInfo>> getCategories() async {
     final token = await _token;
     final response = await _apiClient.get(
-      '/api/v1/materials/categories',
+      ApiEndpoints.materialCategories,
       token: token,
     );
     if (response.statusCode == 200) {
@@ -90,7 +92,7 @@ class MaterialRepository {
   Future<MaterialItem> create(Map<String, dynamic> request) async {
     final token = await _token;
     final response = await _apiClient.post(
-      '/api/v1/materials',
+      ApiEndpoints.materials,
       request,
       token: token,
     );
@@ -104,7 +106,7 @@ class MaterialRepository {
   Future<MaterialItem> update(String id, Map<String, dynamic> request) async {
     final token = await _token;
     final response = await _apiClient.put(
-      '/api/v1/materials/$id',
+      ApiEndpoints.materialById(id),
       request,
       token: token,
     );
@@ -118,7 +120,7 @@ class MaterialRepository {
   Future<void> deactivate(String id) async {
     final token = await _token;
     final response = await _apiClient.delete(
-      '/api/v1/materials/$id',
+      ApiEndpoints.materialById(id),
       token: token,
     );
     if (response.statusCode != 204) {
