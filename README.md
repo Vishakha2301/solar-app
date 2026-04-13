@@ -530,7 +530,6 @@ To keep the app consistent and reduce hardcoded duplication:
 - Base URL config is centralized in `lib/core/config/app_config.dart`.
 - Shared widgets can live under `lib/shared/widgets/` (for example `AppLoadingView`).
 
-
 ## Build Web for release
 
 You can release web with the same environment-based backend URL:

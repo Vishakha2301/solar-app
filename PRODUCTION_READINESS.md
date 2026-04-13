@@ -57,7 +57,6 @@ Use temporary cloud URL for UAT, then rebuild with final DNS later.
 - [ ] Add shared dialog/snackbar helper widgets for UX consistency.
 - [ ] Add shared form validators to reduce duplication.
 
-
 ### 5) Web release readiness
 - [ ] Configure hosting (Firebase Hosting / CloudFront / Netlify / Vercel) with HTTPS and cache headers.
 - [ ] Set `API_BASE_URL` secret for web builds in CI.
