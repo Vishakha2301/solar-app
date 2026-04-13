@@ -38,8 +38,8 @@ Use temporary cloud URL for UAT, then rebuild with final DNS later.
 ## Remaining items needed for production readiness
 
 ### 1) Release engineering
-- [ ] Replace Android `applicationId` (`com.example...`) with final identifier.
-- [ ] Configure production signing key (do not ship debug-signed release).
+- [x] Replace Android `applicationId`/namespace and iOS bundle id with non-template identifiers (`com.solarerp.app`).
+- [ ] Configure production signing key (do not ship debug-signed release). (still pending)
 - [ ] Define semantic versioning + release notes policy.
 
 ### 2) Quality gates
