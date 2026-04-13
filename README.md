@@ -511,3 +511,21 @@ solar_app
       └─ win32_window.h
 
 ```
+## Build APK for client UAT with cloud backend
+
+You can pass backend URL at build time (useful when final DNS is not ready yet):
+
+```bash
+flutter build apk --release --dart-define=API_BASE_URL=https://YOUR_TEMP_BACKEND_URL
+```
+
+If not provided, the app defaults to `http://localhost:8080` for local development.
+
+## Shared configuration and reusable foundations
+
+To keep the app consistent and reduce hardcoded duplication:
+
+- API routes are centralized in `lib/core/constants/api_endpoints.dart`.
+- App-wide strings are centralized in `lib/core/constants/app_strings.dart`.
+- Base URL config is centralized in `lib/core/config/app_config.dart`.
+- Shared widgets can live under `lib/shared/widgets/` (for example `AppLoadingView`).
