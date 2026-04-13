@@ -12,7 +12,7 @@ You can ship an APK to your first client **without final DNS** by hosting backen
 ## What changed to support your rollout idea
 
 - Added compile-time API base URL support using `--dart-define=API_BASE_URL=...`.
-- Network clients now read `AppConfig.apiBaseUrl` instead of hardcoding `http://localhost:8080`.
+- Network clients (including document downloads via `ApiClient`) now read `AppConfig.apiBaseUrl` instead of hardcoding `http://localhost:8080`.
 
 ## How to run pilot without final DNS
 

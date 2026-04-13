@@ -38,6 +38,17 @@ class ApiClient {
     );
   }
 
+  Future<http.Response> getBytes(String path, {String? token}) async {
+    final headers = {
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+
+    return _client.get(
+      Uri.parse('${AppConfig.apiBaseUrl}$path'),
+      headers: headers,
+    );
+  }
+
   Future<http.Response> put(
     String path,
     Map<String, dynamic> body, {
