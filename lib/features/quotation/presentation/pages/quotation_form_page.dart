@@ -80,7 +80,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       roofLabel: c.roofLabel ?? '',
       displayLabel: '',
       isSubsidyProject: false, // resolved later from costing store
-      subsidyAmount: c.subsidyAmount?.toStringAsFixed(0) ?? '0',
+      subsidyAmount: c.subsidyAmount.toStringAsFixed(0),
     )));
 
     _instalments.addAll(q.instalments.map((i) => _InstalmentRow(
@@ -286,7 +286,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  value: customerStore.customers
+                  initialValue: customerStore.customers
                           .any((c) => c.id == _selectedCustomerId)
                       ? _selectedCustomerId
                       : null,
@@ -328,13 +328,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
                       .withValues(alpha: 0.1),
                 ),
                 onPressed: () async {
+                  final customerStore = context.read<CustomerStore>();
                   await Navigator.push(
                     context,
                     MaterialPageRoute(
                         builder: (_) => const CustomerFormPage()),
                   );
-                  if (context.mounted) {
-                    await context.read<CustomerStore>().loadAll();
+                  if (mounted) {
+                    await customerStore.loadAll();
                   }
                 },
               ),
@@ -344,7 +345,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
               resolvedCustomer.sites.isNotEmpty) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              value: resolvedCustomer.sites
+              initialValue: resolvedCustomer.sites
                       .any((s) => s.id == _selectedSiteId)
                   ? _selectedSiteId
                   : null,
@@ -569,13 +570,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             onChanged: (v) =>
                 setState(() => _panelMaterialId = v?.id),
             onAdd: () async {
+              final materialStore = context.read<MaterialStore>();
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                     builder: (_) => const MaterialFormPage()),
               );
-              if (context.mounted) {
-                await context.read<MaterialStore>().loadAll();
+              if (mounted) {
+                await materialStore.loadAll();
               }
             },
           ),
@@ -588,13 +590,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             onChanged: (v) =>
                 setState(() => _inverterMaterialId = v?.id),
             onAdd: () async {
+              final materialStore = context.read<MaterialStore>();
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                     builder: (_) => const MaterialFormPage()),
               );
-              if (context.mounted) {
-                await context.read<MaterialStore>().loadAll();
+              if (mounted) {
+                await materialStore.loadAll();
               }
             },
           ),
@@ -607,13 +610,14 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             onChanged: (v) =>
                 setState(() => _cableMaterialId = v?.id),
             onAdd: () async {
+              final materialStore = context.read<MaterialStore>();
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                     builder: (_) => const MaterialFormPage()),
               );
-              if (context.mounted) {
-                await context.read<MaterialStore>().loadAll();
+              if (mounted) {
+                await materialStore.loadAll();
               }
             },
           ),
@@ -634,7 +638,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       children: [
         Expanded(
           child: DropdownButtonFormField<MaterialItem>(
-            value: value,
+            initialValue: value,
             decoration: InputDecoration(
               labelText: label,
               border: const OutlineInputBorder(),

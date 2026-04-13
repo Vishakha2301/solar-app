@@ -136,7 +136,7 @@ class _MaterialFormPageState extends State<MaterialFormPage> {
               _sectionTitle('Category'),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category *',
                   border: OutlineInputBorder(),

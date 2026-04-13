@@ -1,4 +1,6 @@
-import 'package:flutter/material.dart' show Color, Colors;
+// ignore_for_file: constant_identifier_names
+
+import 'package:flutter/material.dart' show Color;
 import '../../../customer/domain/models/customer.dart';
 import '../../../customer/domain/models/customer_site.dart';
 import 'quotation_costing.dart';

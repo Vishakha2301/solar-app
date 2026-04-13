@@ -1,3 +1,5 @@
+// ignore_for_file: constant_identifier_names
+
 import 'customer_site.dart';
 
 enum CustomerType { INDIVIDUAL, COMPANY, SOCIETY }
