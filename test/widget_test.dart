@@ -1,30 +1,31 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
 
+import 'package:solar_app/features/auth/presentation/state/auth_store.dart';
+import 'package:solar_app/features/costing/presentation/state/costing_store.dart';
+import 'package:solar_app/features/customer/presentation/state/customer_store.dart';
+import 'package:solar_app/features/material/presentation/state/material_store.dart';
+import 'package:solar_app/features/quotation/presentation/state/quotation_store.dart';
 import 'package:solar_app/main.dart';
+import 'package:solar_app/shared/widgets/app_loading_view.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const SolarApp());
+  testWidgets('SolarApp renders auth gate when dependencies are provided',
+      (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => AuthStore()),
+          ChangeNotifierProvider(create: (_) => CostingStore()),
+          ChangeNotifierProvider(create: (_) => CustomerStore()),
+          ChangeNotifierProvider(create: (_) => MaterialStore()),
+          ChangeNotifierProvider(create: (_) => QuotationStore()),
+        ],
+        child: const SolarApp(),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
-
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
-
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+    expect(find.byType(AuthGate), findsOneWidget);
+    expect(find.byType(AppLoadingView), findsOneWidget);
   });
 }
