@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_storage.dart';
 import '../domain/models/saved_costing.dart';
@@ -25,7 +27,7 @@ class CostingRepository {
 
   Future<List<SavedCosting>> getAll() async {
     final token = await _token;
-    final response = await _apiClient.get('/api/v1/costings', token: token);
+    final response = await _apiClient.get(ApiEndpoints.costings, token: token);
     _checkUnauthorized(response.statusCode);
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
@@ -39,7 +41,7 @@ class CostingRepository {
   Future<SavedCosting> create(SavedCosting costing) async {
     final token = await _token;
     final response = await _apiClient.post(
-      '/api/v1/costings',
+      ApiEndpoints.costings,
       costing.toJson(),
       token: token,
     );
@@ -54,7 +56,7 @@ class CostingRepository {
   Future<SavedCosting> update(String id, SavedCosting costing) async {
     final token = await _token;
     final response = await _apiClient.put(
-      '/api/v1/costings/$id',
+      ApiEndpoints.costingById(id),
       costing.toJson(),
       token: token,
     );
@@ -69,7 +71,7 @@ class CostingRepository {
   Future<void> delete(String id) async {
     final token = await _token;
     final response = await _apiClient.delete(
-      '/api/v1/costings/$id',
+      ApiEndpoints.costingById(id),
       token: token,
     );
     _checkUnauthorized(response.statusCode);

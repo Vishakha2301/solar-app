@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../../features/auth/presentation/state/auth_store.dart';
-import '../../../features/costing/presentation/pages/dashboard_page.dart';
-import '../../../features/customer/presentation/pages/customer_list_page.dart';
-import '../../../features/material/presentation/pages/material_list_page.dart';
-import '../../../features/quotation/presentation/pages/quotation_list_page.dart';
+
+import '../../features/auth/presentation/state/auth_store.dart';
+import '../../features/costing/presentation/pages/dashboard_page.dart';
+import '../../features/customer/presentation/pages/customer_list_page.dart';
+import '../../features/material/presentation/pages/material_list_page.dart';
+import '../../features/quotation/presentation/pages/quotation_list_page.dart';
+import '../constants/app_strings.dart';
 
 class AppShell extends StatefulWidget {
   const AppShell({super.key});
@@ -17,24 +19,38 @@ class _AppShellState extends State<AppShell> {
   int _selectedIndex = 0;
 
   final List<_NavItem> _navItems = const [
-    _NavItem(icon: Icons.calculate_outlined, activeIcon: Icons.calculate, label: 'Costing'),
-    _NavItem(icon: Icons.people_outline, activeIcon: Icons.people, label: 'Customers'),
-    _NavItem(icon: Icons.inventory_2_outlined, activeIcon: Icons.inventory_2, label: 'Materials'),
-    _NavItem(icon: Icons.description_outlined, activeIcon: Icons.description, label: 'Quotations'),
+    _NavItem(
+      icon: Icons.calculate_outlined,
+      activeIcon: Icons.calculate,
+      label: 'Costing',
+    ),
+    _NavItem(
+      icon: Icons.people_outline,
+      activeIcon: Icons.people,
+      label: 'Customers',
+    ),
+    _NavItem(
+      icon: Icons.inventory_2_outlined,
+      activeIcon: Icons.inventory_2,
+      label: 'Materials',
+    ),
+    _NavItem(
+      icon: Icons.description_outlined,
+      activeIcon: Icons.description,
+      label: 'Quotations',
+    ),
   ];
 
   final List<Widget> _pages = const [
     DashboardPage(),
     CustomerListPage(),
     MaterialListPage(),
-		QuotationListPage(),
-    Scaffold(body: Center(child: Text('Quotations — coming soon'))),
+    QuotationListPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     final isWide = MediaQuery.of(context).size.width >= 800;
-
     return isWide ? _buildWideLayout() : _buildNarrowLayout();
   }
 
@@ -51,11 +67,13 @@ class _AppShellState extends State<AppShell> {
             leading: _sidebarHeader(),
             trailing: _sidebarFooter(),
             destinations: _navItems
-                .map((item) => NavigationRailDestination(
-                      icon: Icon(item.icon),
-                      selectedIcon: Icon(item.activeIcon),
-                      label: Text(item.label),
-                    ))
+                .map(
+                  (item) => NavigationRailDestination(
+                    icon: Icon(item.icon),
+                    selectedIcon: Icon(item.activeIcon),
+                    label: Text(item.label),
+                  ),
+                )
                 .toList(),
           ),
           const VerticalDivider(width: 1),
@@ -75,18 +93,18 @@ class _AppShellState extends State<AppShell> {
         },
         children: [
           _drawerHeader(),
-          ..._navItems.map((item) => NavigationDrawerDestination(
-                icon: Icon(item.icon),
-                selectedIcon: Icon(item.activeIcon),
-                label: Text(item.label),
-              )),
+          ..._navItems.map(
+            (item) => NavigationDrawerDestination(
+              icon: Icon(item.icon),
+              selectedIcon: Icon(item.activeIcon),
+              label: Text(item.label),
+            ),
+          ),
           const Divider(),
           _drawerLogout(),
         ],
       ),
-      appBar: AppBar(
-        title: Text(_navItems[_selectedIndex].label),
-      ),
+      appBar: AppBar(title: Text(_navItems[_selectedIndex].label)),
       body: _pages[_selectedIndex],
     );
   }
@@ -99,7 +117,7 @@ class _AppShellState extends State<AppShell> {
           const Icon(Icons.solar_power, size: 40, color: Colors.orange),
           const SizedBox(height: 8),
           const Text(
-            'Solar ERP',
+            AppStrings.appTitle,
             style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
           ),
           const SizedBox(height: 4),
@@ -124,8 +142,10 @@ class _AppShellState extends State<AppShell> {
             width: 220,
             child: ListTile(
               leading: const Icon(Icons.logout, color: Colors.red),
-              title: const Text('Logout',
-                  style: TextStyle(color: Colors.red)),
+              title: const Text(
+                AppStrings.logout,
+                style: TextStyle(color: Colors.red),
+              ),
               onTap: _confirmLogout,
             ),
           ),
@@ -140,20 +160,18 @@ class _AppShellState extends State<AppShell> {
         context.watch<AuthStore>().username ?? '',
         style: const TextStyle(fontWeight: FontWeight.bold),
       ),
-      accountEmail: const Text('Solar ERP'),
+      accountEmail: const Text(AppStrings.appTitle),
       currentAccountPicture: const CircleAvatar(
         child: Icon(Icons.solar_power, size: 32, color: Colors.orange),
       ),
-      decoration: BoxDecoration(
-        color: Theme.of(context).primaryColor,
-      ),
+      decoration: BoxDecoration(color: Theme.of(context).primaryColor),
     );
   }
 
   Widget _drawerLogout() {
     return ListTile(
       leading: const Icon(Icons.logout, color: Colors.red),
-      title: const Text('Logout', style: TextStyle(color: Colors.red)),
+      title: const Text(AppStrings.logout, style: TextStyle(color: Colors.red)),
       onTap: _confirmLogout,
     );
   }
@@ -162,20 +180,21 @@ class _AppShellState extends State<AppShell> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Logout?'),
-        content: const Text('Are you sure you want to logout?'),
+        title: const Text(AppStrings.logoutTitle),
+        content: const Text(AppStrings.logoutConfirmation),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text(AppStrings.cancel),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Logout'),
+            child: const Text(AppStrings.logout),
           ),
         ],
       ),
     );
+
     if (confirm == true && mounted) {
       await context.read<AuthStore>().logout();
     }

@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_storage.dart';
 
@@ -14,7 +16,7 @@ class AuthRepository {
 
   Future<void> login(String identifier, String password) async {
     final response = await _apiClient.post(
-      '/api/v1/auth/login',
+      ApiEndpoints.authLogin,
       {'identifier': identifier, 'password': password},
     );
 
