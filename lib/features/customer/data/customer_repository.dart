@@ -1,4 +1,6 @@
 import 'dart:convert';
+
+import '../../../core/constants/api_endpoints.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/storage/token_storage.dart';
 import '../domain/models/customer.dart';
@@ -17,7 +19,7 @@ class CustomerRepository {
 
   Future<List<Customer>> getAll() async {
     final token = await _token;
-    final response = await _apiClient.get('/api/v1/customers', token: token);
+    final response = await _apiClient.get(ApiEndpoints.customers, token: token);
     if (response.statusCode == 200) {
       final List<dynamic> data = jsonDecode(response.body);
       return data
@@ -29,7 +31,7 @@ class CustomerRepository {
 
   Future<Customer> getById(String id) async {
     final token = await _token;
-    final response = await _apiClient.get('/api/v1/customers/$id', token: token);
+    final response = await _apiClient.get(ApiEndpoints.customerById(id), token: token);
     if (response.statusCode == 200) {
       return Customer.fromJson(jsonDecode(response.body) as Map<String, dynamic>);
     }
@@ -39,7 +41,7 @@ class CustomerRepository {
   Future<List<Customer>> search(String name) async {
     final token = await _token;
     final response = await _apiClient.get(
-      '/api/v1/customers/search?name=$name',
+      ApiEndpoints.searchCustomers(name),
       token: token,
     );
     if (response.statusCode == 200) {
@@ -54,7 +56,7 @@ class CustomerRepository {
   Future<Customer> create(Map<String, dynamic> request) async {
     final token = await _token;
     final response = await _apiClient.post(
-      '/api/v1/customers',
+      ApiEndpoints.customers,
       request,
       token: token,
     );
@@ -68,7 +70,7 @@ class CustomerRepository {
   Future<Customer> update(String id, Map<String, dynamic> request) async {
     final token = await _token;
     final response = await _apiClient.put(
-      '/api/v1/customers/$id',
+      ApiEndpoints.customerById(id),
       request,
       token: token,
     );
@@ -82,7 +84,7 @@ class CustomerRepository {
   Future<void> deactivate(String id) async {
     final token = await _token;
     final response = await _apiClient.delete(
-      '/api/v1/customers/$id',
+      ApiEndpoints.customerById(id),
       token: token,
     );
     if (response.statusCode != 204) {

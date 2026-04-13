@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import '../constants/api_endpoints.dart';
 import '../network/api_client.dart';
 import '../storage/token_storage.dart';
 import 'document_service_web.dart'
@@ -22,7 +23,7 @@ class DocumentService {
     final token = await _tokenStorage.getToken();
 
     final response = await _apiClient.getBytes(
-      '/api/v1/quotations/$quotationId/document',
+      ApiEndpoints.quotationDocument(quotationId),
       token: token,
     );
 

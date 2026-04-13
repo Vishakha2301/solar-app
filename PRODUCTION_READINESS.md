@@ -4,54 +4,59 @@ Date: 2026-04-13
 
 ## Verdict
 
-**For public production launch: Not ready.**  
-**For first-client pilot APK: Feasible with a controlled UAT setup.**
+- **Public production launch**: Not ready yet.
+- **First-client pilot APK (UAT)**: Feasible with controlled rollout.
 
-You can ship an APK to your first client **without final DNS** by hosting backend on cloud and passing a temporary backend URL at build time.
+## Consistency improvements added now
 
-## What changed to support your rollout idea
+To support your requirement — "change once, consume everywhere" — this codebase now has centralized reusable config layers:
 
-- Added compile-time API base URL support using `--dart-define=API_BASE_URL=...`.
-- Network clients (including document downloads via `ApiClient`) now read `AppConfig.apiBaseUrl` instead of hardcoding `http://localhost:8080`.
+1. **Shared API endpoint catalog**
+   - `lib/core/constants/api_endpoints.dart`
+   - All repositories + document download now consume endpoint constants/helpers instead of hardcoded URL paths.
 
-## How to run pilot without final DNS
+2. **Shared app strings**
+   - `lib/core/constants/app_strings.dart`
+   - Reused app title and logout-related labels in `main.dart` and `app_shell.dart`.
 
-1. Deploy backend to cloud with a reachable URL (temporary domain or public IP).
-2. Build APK with backend URL embedded:
+3. **Shared reusable UI component**
+   - `lib/shared/widgets/app_loading_view.dart`
+   - Used in auth loading state so future loading-screen updates happen in one place.
+
+4. **Shared environment config**
+   - `lib/core/config/app_config.dart`
+   - Base URL remains configurable via `--dart-define=API_BASE_URL=...`.
+
+## How to build APK for first client (without final DNS)
 
 ```bash
 flutter build apk --release --dart-define=API_BASE_URL=https://YOUR_TEMP_BACKEND_URL
 ```
 
-3. Share APK with your client for UAT.
-4. Keep DNS/domain finalization for later; when ready, rebuild APK with the final URL.
+Use temporary cloud URL for UAT, then rebuild with final DNS later.
 
-## Remaining launch blockers (for real production)
+## Remaining items needed for production readiness
 
-1. **Android app id is still template**
-   - `applicationId = "com.example.solar_app"` must be replaced.
+### 1) Release engineering
+- [ ] Replace Android `applicationId` (`com.example...`) with final identifier.
+- [ ] Configure production signing key (do not ship debug-signed release).
+- [ ] Define semantic versioning + release notes policy.
 
-2. **Android release signing is debug**
-   - Release build is still signed with debug key.
+### 2) Quality gates
+- [ ] Fix/replace scaffold widget tests with feature tests (auth, costing, quotation).
+- [ ] Add CI pipeline for `flutter analyze`, `flutter test`, and release build checks.
+- [ ] Add basic API contract/integration checks before release.
 
-3. **Default metadata/branding remains**
-   - Android label and iOS bundle name still show scaffold defaults.
+### 3) Security and operations
+- [ ] Ensure HTTPS backend for client APKs.
+- [ ] Add crash reporting and structured logging.
+- [ ] Document incident rollback plan for UAT/prod.
 
-4. **Automated tests are scaffold-level**
-   - Widget test is the default counter test and not aligned with current app flows.
-
-5. **Cleanup TODO remains**
-   - `initial_calculator_state.dart` still contains deletion TODO.
-
-## Recommended next steps (priority order)
-
-- [ ] Set real Android application id and iOS bundle id.
-- [ ] Configure proper release signing for Android.
-- [ ] Replace scaffold metadata/icons with client-facing branding.
-- [ ] Add at least smoke tests for login + quotation creation flows.
-- [ ] Remove release-impact TODOs.
-- [ ] Add CI to run analyze + test before every release.
+### 4) Architecture consistency (next)
+- [ ] Add common error model and shared API error mapper.
+- [ ] Add shared dialog/snackbar helper widgets for UX consistency.
+- [ ] Add shared form validators to reduce duplication.
 
 ## Environment note
 
-Flutter is not installed in this container, so I could not run `flutter analyze`, `flutter test`, or generate an APK here. This assessment is based on source inspection and configuration updates.
+Flutter is not installed in this container, so I could not run `flutter analyze`, `flutter test`, or produce APK artifacts here.
