@@ -5,7 +5,18 @@ Date: 2026-04-13
 ## Verdict
 
 - **Public production launch**: Not ready yet.
-- **First-client pilot APK (UAT)**: Feasible with controlled rollout.
+- **First-customer pilot release (mobile/web UAT)**: Feasible with controlled rollout after the **must-do** items below are completed.
+
+## Must-do before first customer release
+
+These are the minimum blockers to clear before handing this to a first paying customer:
+
+1. Configure production Android signing key (avoid debug-signed release artifact).
+2. Enforce quality gate execution in CI (`flutter analyze`, `flutter test`, release build).
+3. Ensure production backend URL is HTTPS for all clients (mobile + web).
+4. Prepare a rollback runbook (owner + trigger + rollback steps).
+
+If these four items are done, you can proceed with a controlled first-customer rollout.
 
 ## Consistency improvements added now
 
@@ -27,10 +38,11 @@ To support your requirement — "change once, consume everywhere" — this codeb
    - `lib/core/config/app_config.dart`
    - Base URL remains configurable via `--dart-define=API_BASE_URL=...`.
 
-## How to build APK for first client (without final DNS)
+## How to build release artifacts (without final DNS)
 
 ```bash
 flutter build apk --release --dart-define=API_BASE_URL=https://YOUR_TEMP_BACKEND_URL
+flutter build web --release --dart-define=API_BASE_URL=https://YOUR_TEMP_BACKEND_URL
 ```
 
 Use temporary cloud URL for UAT, then rebuild with final DNS later.
@@ -40,7 +52,7 @@ Use temporary cloud URL for UAT, then rebuild with final DNS later.
 ### 1) Release engineering
 - [x] Replace Android `applicationId`/namespace and iOS bundle id with non-template identifiers (`com.solarerp.app`).
 - [ ] Configure production signing key (do not ship debug-signed release). (still pending)
-- [ ] Define semantic versioning + release notes policy.
+- [x] Define semantic versioning + release notes policy (`RELEASE_POLICY.md`).
 
 ### 2) Quality gates
 - [ ] Fix/replace scaffold widget tests with feature tests (auth, costing, quotation).
@@ -48,7 +60,7 @@ Use temporary cloud URL for UAT, then rebuild with final DNS later.
 - [ ] Add basic API contract/integration checks before release.
 
 ### 3) Security and operations
-- [ ] Ensure HTTPS backend for client APKs.
+- [ ] Ensure HTTPS backend for production clients (mobile + web).
 - [ ] Add crash reporting and structured logging.
 - [ ] Document incident rollback plan for UAT/prod.
 
