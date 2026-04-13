@@ -529,3 +529,17 @@ To keep the app consistent and reduce hardcoded duplication:
 - App-wide strings are centralized in `lib/core/constants/app_strings.dart`.
 - Base URL config is centralized in `lib/core/config/app_config.dart`.
 - Shared widgets can live under `lib/shared/widgets/` (for example `AppLoadingView`).
+
+## Build Web for release
+
+You can release web with the same environment-based backend URL:
+
+```bash
+flutter build web --release --dart-define=API_BASE_URL=https://YOUR_TEMP_BACKEND_URL
+```
+
+CI workflow is available at `.github/workflows/flutter-ci.yml` and includes:
+- `flutter analyze`
+- `flutter test`
+- Android APK build
+- Web build

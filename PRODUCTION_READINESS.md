@@ -44,7 +44,7 @@ Use temporary cloud URL for UAT, then rebuild with final DNS later.
 
 ### 2) Quality gates
 - [ ] Fix/replace scaffold widget tests with feature tests (auth, costing, quotation).
-- [ ] Add CI pipeline for `flutter analyze`, `flutter test`, and release build checks.
+- [x] Add CI pipeline for `flutter analyze`, `flutter test`, and release build checks (`.github/workflows/flutter-ci.yml`).
 - [ ] Add basic API contract/integration checks before release.
 
 ### 3) Security and operations
@@ -56,6 +56,11 @@ Use temporary cloud URL for UAT, then rebuild with final DNS later.
 - [ ] Add common error model and shared API error mapper.
 - [ ] Add shared dialog/snackbar helper widgets for UX consistency.
 - [ ] Add shared form validators to reduce duplication.
+
+### 5) Web release readiness
+- [ ] Configure hosting (Firebase Hosting / CloudFront / Netlify / Vercel) with HTTPS and cache headers.
+- [ ] Set `API_BASE_URL` secret for web builds in CI.
+- [ ] Add smoke checks for core web flows after deploy (login, dashboard, CRUD basics).
 
 ## Environment note
 
