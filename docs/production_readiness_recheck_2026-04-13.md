@@ -2,60 +2,54 @@
 
 ## Overall status
 
-**Not production-ready yet.**
+**Partially ready, but release execution prerequisites are still pending.**
 
-The repository still contains release-blocking configuration issues, and this environment cannot execute Flutter/Dart validation commands.
+Core safeguards have now been implemented in code, but production release cannot be completed until environment/tooling/signing prerequisites are in place and validated.
 
-## What was checked
+## What is already completed
 
-### 1) Build and test toolchain availability
+1. **Release API safety guardrails are implemented**
+   - `API_BASE_URL` validation exists in `lib/core/config/app_config.dart`.
+   - In release mode, missing `API_BASE_URL` fails fast.
+   - In release mode, non-HTTPS URLs fail fast.
+   - Local development fallback (`http://localhost:8080`) remains available outside release mode.
 
-- `flutter --version` → `command not found`
-- `dart --version` → `command not found`
+2. **Android debug-key release signing fallback has been removed**
+   - `android/app/build.gradle.kts` now loads `android/key.properties`.
+   - A `release` signing config is configured from keystore properties.
+   - Release tasks fail with a clear `GradleException` if keystore values are missing.
 
-Because of this, static analysis, widget tests, and release builds were not runnable in this environment.
+3. **Stale placeholder file has been removed**
+   - `lib/features/costing/domain/config/initial_calculator_state.dart` is deleted.
 
-### 2) Release configuration
+4. **Developer/operator guidance has been updated**
+   - `android/key.properties.example` was added.
+   - README now documents release API/signing requirements.
 
-- Android release build is configured to sign with the debug signing key.
-  - File: `android/app/build.gradle.kts`
-  - Current setting: `signingConfig = signingConfigs.getByName("debug")`
-- Android build file still contains TODOs for production app identity/signing setup.
+## What is still remaining
 
-### 3) Runtime API endpoint safety
+1. **Provide real Android release signing secrets/artifacts**
+   - Create `android/key.properties` from the example.
+   - Ensure referenced keystore file exists in the expected location.
+   - Validate signed release build output in CI or local release machine.
 
-- Default API base URL is plain HTTP and localhost:
-  - File: `lib/core/config/app_config.dart`
-  - Current default: `http://localhost:8080`
-
-This is acceptable for local development, but not safe as a production default.
-
-### 4) Codebase hygiene indicators
-
-- A stale TODO remains in an effectively deprecated file:
-  - File: `lib/features/costing/domain/config/initial_calculator_state.dart`
-  - TODO says the file should be deleted.
-
-### 5) Project quality gates
-
-- No CI workflow directory (`.github/workflows`) is present in this repository snapshot.
-- Existing test coverage appears minimal (single widget smoke test in `test/widget_test.dart`).
-
-## Release blockers
-
-1. **Android release signing is using debug key** (hard blocker).
-2. **Production-safe API endpoint defaults are not enforced** (hard blocker unless guaranteed by build-time environment injection).
-3. **No runnable verification in current environment** (`flutter analyze`, `flutter test`, and release build checks unavailable here).
-
-## Recommended next steps
-
-1. Configure proper release signing for Android (keystore + `signingConfigs.release`).
-2. Make `API_BASE_URL` required for release builds and enforce HTTPS in production.
-3. Remove deprecated dead file(s) and TODO markers before release cut.
-4. Add CI checks at minimum:
-   - `flutter format --set-exit-if-changed .`
+2. **Run full quality gate in a Flutter-enabled environment**
+   - `flutter pub get`
    - `flutter analyze`
    - `flutter test`
-5. Run platform release checks in a Flutter-enabled environment:
-   - `flutter build appbundle --release`
-   - `flutter build ipa --release` (or Xcode archive pipeline)
+   - `flutter build apk --release --dart-define=API_BASE_URL=https://...`
+   - `flutter build web --release --dart-define=API_BASE_URL=https://...`
+
+3. **Confirm CI secrets/configuration for release build jobs**
+   - If CI runs Android release jobs, provide keystore inputs securely.
+   - Otherwise, gate/skip release job on secret availability.
+
+4. **Expand test coverage beyond current smoke-level checks**
+   - Add feature-level tests for auth/network failure states and critical costing flows.
+
+5. **Perform iOS release readiness validation**
+   - Confirm Apple signing/provisioning setup and run release archive validation.
+
+## Direct answer to "Anything else remaining?"
+
+**Yes.** The main remaining items are operational: release signing inputs, CI release configuration, and running the full analyze/test/build pipeline in a Flutter-enabled environment.
