@@ -138,7 +138,6 @@ solar_app
 │  │  └─ costing
 │  │     ├─ domain
 │  │     │  ├─ config
-│  │     │  │  └─ initial_calculator_state.dart
 │  │     │  ├─ models
 │  │     │  │  ├─ calculator_fields.dart
 │  │     │  │  ├─ component_cost.dart
@@ -388,7 +387,6 @@ solar_app
 │  │  └─ costing
 │  │     ├─ domain
 │  │     │  ├─ config
-│  │     │  │  └─ initial_calculator_state.dart
 │  │     │  ├─ models
 │  │     │  │  ├─ calculator_fields.dart
 │  │     │  │  ├─ component_cost.dart
@@ -519,7 +517,18 @@ You can pass backend URL at build time (useful when final DNS is not ready yet):
 flutter build apk --release --dart-define=API_BASE_URL=https://YOUR_TEMP_BACKEND_URL
 ```
 
-If not provided, the app defaults to `http://localhost:8080` for local development.
+`API_BASE_URL` defaults to `http://localhost:8080` for local development.
+In release mode, you must provide `API_BASE_URL` and it must be an `https://` URL.
+
+### Android release signing setup
+
+Release builds require keystore-based signing.
+
+1. Copy `android/key.properties.example` to `android/key.properties`.
+2. Fill in `storeFile`, `storePassword`, `keyAlias`, and `keyPassword`.
+3. Keep `android/key.properties` and keystore files private (already gitignored).
+
+Without this file, Android release builds will fail intentionally to prevent debug-key signing.
 
 ## Shared configuration and reusable foundations
 
