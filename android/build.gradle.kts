@@ -13,9 +13,11 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
-val isReleaseTaskRequested = gradle.startParameter.taskNames.any {
-    it.contains("Release", ignoreCase = true)
-}
+
+val hasReleaseSigning = !(keystoreProperties["storeFile"] as String?).isNullOrBlank() &&
+    !(keystoreProperties["storePassword"] as String?).isNullOrBlank() &&
+    !(keystoreProperties["keyAlias"] as String?).isNullOrBlank() &&
+    !(keystoreProperties["keyPassword"] as String?).isNullOrBlank()
 
 android {
     namespace = "com.solarerp.app"
@@ -35,30 +37,25 @@ android {
         versionName = flutter.versionName
     }
 
-    signingConfigs {
-        create("release") {
-            keyAlias = keystoreProperties["keyAlias"] as String?
-            keyPassword = keystoreProperties["keyPassword"] as String?
-            storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
-            storePassword = keystoreProperties["storePassword"] as String?
+    if (hasReleaseSigning) {
+        signingConfigs {
+            create("release") {
+                keyAlias = keystoreProperties["keyAlias"] as String?
+                keyPassword = keystoreProperties["keyPassword"] as String?
+                storeFile = (keystoreProperties["storeFile"] as String?)?.let { file(it) }
+                storePassword = keystoreProperties["storePassword"] as String?
+            }
         }
     }
 
     buildTypes {
         release {
-            val hasReleaseSigning = !(keystoreProperties["storeFile"] as String?).isNullOrBlank() &&
-                !(keystoreProperties["storePassword"] as String?).isNullOrBlank() &&
-                !(keystoreProperties["keyAlias"] as String?).isNullOrBlank() &&
-                !(keystoreProperties["keyPassword"] as String?).isNullOrBlank()
-
-            if (isReleaseTaskRequested && !hasReleaseSigning) {
-                throw GradleException(
-                    "Missing Android release signing configuration. Add android/key.properties with storeFile, storePassword, keyAlias, and keyPassword.",
-                )
-            }
-
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fall back to debug signing for UAT/testing builds.
+                // For Play Store release, provide android/key.properties.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
