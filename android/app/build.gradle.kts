@@ -1,5 +1,4 @@
 import java.util.Properties
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -46,15 +45,10 @@ android {
 
     buildTypes {
         release {
-            val storeFilePath = keystoreProperties.getProperty("storeFile")
-            val storePassword = keystoreProperties.getProperty("storePassword")
-            val keyAlias = keystoreProperties.getProperty("keyAlias")
-            val keyPassword = keystoreProperties.getProperty("keyPassword")
-
-            val hasReleaseSigning = !storeFilePath.isNullOrBlank() &&
-                !storePassword.isNullOrBlank() &&
-                !keyAlias.isNullOrBlank() &&
-                !keyPassword.isNullOrBlank()
+            val hasReleaseSigning = !keystoreProperties["storeFile"].isNullOrBlank() &&
+                !keystoreProperties["storePassword"].isNullOrBlank() &&
+                !keystoreProperties["keyAlias"].isNullOrBlank() &&
+                !keystoreProperties["keyPassword"].isNullOrBlank()
 
             if (isReleaseTaskRequested && !hasReleaseSigning) {
                 throw GradleException(
