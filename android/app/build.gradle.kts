@@ -12,10 +12,6 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
-val isReleaseTaskRequested = gradle.startParameter.taskNames.any {
-    it.contains("Release", ignoreCase = true)
-}
-
 android {
     namespace = "com.solarerp.app"
     compileSdk = flutter.compileSdkVersion
@@ -54,14 +50,11 @@ android {
                 !(keystoreProperties["keyAlias"] as String?).isNullOrBlank() &&
                 !(keystoreProperties["keyPassword"] as String?).isNullOrBlank()
 
-            if (isReleaseTaskRequested && !hasReleaseSigning) {
-                throw GradleException(
-                    "Missing Android release signing configuration. Add android/key.properties with storeFile, storePassword, keyAlias, and keyPassword.",
-                )
-            }
-
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fall back to debug signing for CI/UAT builds when release keys are unavailable.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
