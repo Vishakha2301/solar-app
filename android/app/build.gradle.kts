@@ -61,6 +61,17 @@ android {
 }
 
 
+
+val syncFlutterReleaseApk by tasks.registering(Copy::class) {
+    from(layout.buildDirectory.dir("outputs/apk/release"))
+    include("*.apk")
+    into(layout.buildDirectory.dir("outputs/flutter-apk"))
+}
+
+tasks.named("assembleRelease") {
+    finalizedBy(syncFlutterReleaseApk)
+}
+
 flutter {
     source = "../.."
 }
