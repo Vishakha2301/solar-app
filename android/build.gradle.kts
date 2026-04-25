@@ -1,3 +1,5 @@
+import java.io.File
+
 allprojects {
     repositories {
         google()
@@ -5,12 +7,10 @@ allprojects {
     }
 }
 
-val newBuildDir = rootProject.layout.buildDirectory.dir("../build").get()
-rootProject.layout.buildDirectory.value(newBuildDir)
+rootProject.buildDir = file("../build")
 
 subprojects {
-    val newSubprojectBuildDir = newBuildDir.dir(name)
-    layout.buildDirectory.value(newSubprojectBuildDir)
+    buildDir = File(rootProject.buildDir, name)
 }
 
 subprojects {
@@ -18,5 +18,5 @@ subprojects {
 }
 
 tasks.register<Delete>("clean") {
-    delete(rootProject.layout.buildDirectory)
+    delete(rootProject.buildDir)
 }
