@@ -68,7 +68,7 @@ val syncFlutterReleaseApk by tasks.registering(Copy::class) {
     into(layout.buildDirectory.dir("outputs/flutter-apk"))
 }
 
-tasks.named("assembleRelease") {
+tasks.matching { it.name == "assembleRelease" }.configureEach {
     finalizedBy(syncFlutterReleaseApk)
 }
 
