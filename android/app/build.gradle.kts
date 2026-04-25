@@ -12,10 +12,6 @@ val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystorePropertiesFile.inputStream().use { keystoreProperties.load(it) }
 }
-val isReleaseTaskRequested = gradle.startParameter.taskNames.any {
-    it.contains("Release", ignoreCase = true)
-}
-
 android {
     namespace = "com.solarerp.app"
     compileSdk = flutter.compileSdkVersion
@@ -24,6 +20,10 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
     }
 
     defaultConfig {
@@ -45,29 +45,23 @@ android {
 
     buildTypes {
         release {
-            val hasReleaseSigning = !keystoreProperties["storeFile"].isNullOrBlank() &&
-                !keystoreProperties["storePassword"].isNullOrBlank() &&
-                !keystoreProperties["keyAlias"].isNullOrBlank() &&
-                !keystoreProperties["keyPassword"].isNullOrBlank()
-
-            if (isReleaseTaskRequested && !hasReleaseSigning) {
-                throw GradleException(
-                    "Missing Android release signing configuration. Add android/key.properties with storeFile, storePassword, keyAlias, and keyPassword.",
-                )
-            }
+            val hasReleaseSigning = !(keystoreProperties["storeFile"] as String?).isNullOrBlank() &&
+                !(keystoreProperties["storePassword"] as String?).isNullOrBlank() &&
+                !(keystoreProperties["keyAlias"] as String?).isNullOrBlank() &&
+                !(keystoreProperties["keyPassword"] as String?).isNullOrBlank()
 
             if (hasReleaseSigning) {
                 signingConfig = signingConfigs.getByName("release")
+            } else {
+                // Fall back to debug signing for CI/UAT builds when release keys are unavailable.
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
+
+
 
 flutter {
     source = "../.."

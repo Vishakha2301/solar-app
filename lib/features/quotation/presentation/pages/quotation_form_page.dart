@@ -286,7 +286,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
             children: [
               Expanded(
                 child: DropdownButtonFormField<String>(
-                  initialValue: customerStore.customers
+                  value: customerStore.customers
                           .any((c) => c.id == _selectedCustomerId)
                       ? _selectedCustomerId
                       : null,
@@ -345,7 +345,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
               resolvedCustomer.sites.isNotEmpty) ...[
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
-              initialValue: resolvedCustomer.sites
+              value: resolvedCustomer.sites
                       .any((s) => s.id == _selectedSiteId)
                   ? _selectedSiteId
                   : null,
@@ -638,7 +638,7 @@ class _QuotationFormPageState extends State<QuotationFormPage> {
       children: [
         Expanded(
           child: DropdownButtonFormField<MaterialItem>(
-            initialValue: value,
+            value: value,
             decoration: InputDecoration(
               labelText: label,
               border: const OutlineInputBorder(),
