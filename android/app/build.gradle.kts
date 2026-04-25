@@ -26,6 +26,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = JavaVersion.VERSION_17.toString()
+    }
+
     defaultConfig {
         applicationId = "com.solarerp.app"
         minSdk = flutter.minSdkVersion
@@ -45,10 +49,10 @@ android {
 
     buildTypes {
         release {
-            val hasReleaseSigning = !keystoreProperties["storeFile"].isNullOrBlank() &&
-                !keystoreProperties["storePassword"].isNullOrBlank() &&
-                !keystoreProperties["keyAlias"].isNullOrBlank() &&
-                !keystoreProperties["keyPassword"].isNullOrBlank()
+            val hasReleaseSigning = !(keystoreProperties["storeFile"] as String?).isNullOrBlank() &&
+                !(keystoreProperties["storePassword"] as String?).isNullOrBlank() &&
+                !(keystoreProperties["keyAlias"] as String?).isNullOrBlank() &&
+                !(keystoreProperties["keyPassword"] as String?).isNullOrBlank()
 
             if (isReleaseTaskRequested && !hasReleaseSigning) {
                 throw GradleException(
@@ -63,11 +67,6 @@ android {
     }
 }
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
-}
 
 flutter {
     source = "../.."
