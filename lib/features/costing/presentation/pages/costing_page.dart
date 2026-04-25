@@ -367,7 +367,7 @@ class _CostingPageState extends State<CostingPage> {
 
                     DropdownButtonFormField<String>(
                       key: ValueKey(formState.systemType),
-                      initialValue: formState.systemType,
+                      value: formState.systemType,
                       decoration:
                           const InputDecoration(labelText: 'System Type'),
                       items: const [
@@ -384,7 +384,7 @@ class _CostingPageState extends State<CostingPage> {
 
                     DropdownButtonFormField<String>(
                       key: ValueKey(formState.phaseType),
-                      initialValue: formState.phaseType,
+                      value: formState.phaseType,
                       decoration:
                           const InputDecoration(labelText: 'Phase Type'),
                       items: const [
@@ -400,7 +400,7 @@ class _CostingPageState extends State<CostingPage> {
 
                     DropdownButtonFormField<String>(
                       key: ValueKey(formState.roofType),
-                      initialValue: formState.roofType,
+                      value: formState.roofType,
                       decoration:
                           const InputDecoration(labelText: 'Roof Type'),
                       items: const [
